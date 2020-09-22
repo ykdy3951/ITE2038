@@ -1,12 +1,12 @@
-SELECT name
+SELECT DISTINCT name
 FROM Pokemon,
-(
+  (
   SELECT P.type, COUNT(P.type) as CNT
   FROM Pokemon as P
   GROUP BY P.type
-) as Type_Info, 
-(
-  SELECT COUNT(P1.type) as CNT 
+) as Type_Info,
+  (
+  SELECT COUNT(P1.type) as CNT
   FROM Pokemon as P1
   GROUP BY P1.type
   ORDER BY COUNT(P1.type) DESC LIMIT 2
