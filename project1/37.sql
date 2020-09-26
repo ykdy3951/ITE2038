@@ -1,4 +1,4 @@
-SELECT name
+SELECT name, Sum
 FROM (
   SELECT name, SUM(level) as Sum
   FROM CatchedPokemon as CP, Trainer as T

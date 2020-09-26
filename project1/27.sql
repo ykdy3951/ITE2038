@@ -1,4 +1,4 @@
-SELECT MAX(level)
+SELECT T.name, MAX(level)
 FROM Trainer as T, CatchedPokemon as CP
 WHERE T.id=CP.owner_id
 GROUP BY T.name
