@@ -1,100 +1,88 @@
 #include "bpt.h"
-
+#include "file.h"
+#include <inttypes.h>
+#include <stdio.h>
 // MAIN
 
-int main( int argc, char ** argv ) {
-
-    char * input_file;
-    FILE * fp;
-    node * root;
-    int input, range2;
-    char instruction;
-    char license_part;
-
-    root = NULL;
-    verbose_output = false;
-
-    if (argc > 1) {
-        order = atoi(argv[1]);
-        if (order < MIN_ORDER || order > MAX_ORDER) {
-            fprintf(stderr, "Invalid order: %d .\n\n", order);
-            usage_3();
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    license_notice();
-    usage_1();  
-    usage_2();
-
-    if (argc > 2) {
-        input_file = argv[2];
-        fp = fopen(input_file, "r");
-        if (fp == NULL) {
-            perror("Failure  open input file.");
-            exit(EXIT_FAILURE);
-        }
-        while (!feof(fp)) {
-            fscanf(fp, "%d\n", &input);
-            root = insert(root, input, input);
-        }
-        fclose(fp);
-        print_tree(root);
-    }
+int main(int argc, char **argv)
+{
+    header_page = (header_page_t *)malloc(page_size);
+    char command;
+    int64_t key;
+    char value[120];
 
     printf("> ");
-    while (scanf("%c", &instruction) != EOF) {
-        switch (instruction) {
-        case 'd':
-            scanf("%d", &input);
-            root = delete(root, input);
-            print_tree(root);
-            break;
-        case 'i':
-            scanf("%d", &input);
-            root = insert(root, input, input);
-            print_tree(root);
+    while (scanf("%c", &command) != EOF)
+    {
+        switch (command)
+        {
+        case 'o':
+            scanf("%s", value);
+            open_table(value);
             break;
         case 'f':
-        case 'p':
-            scanf("%d", &input);
-            find_and_print(root, input, instruction == 'p');
-            break;
-        case 'r':
-            scanf("%d %d", &input, &range2);
-            if (input > range2) {
-                int tmp = range2;
-                range2 = input;
-                input = tmp;
+            scanf("%lld", &key);
+            char *ret_val = (char *)malloc(val_size);
+            if (!db_find(key, ret_val))
+            {
+                printf("THIS KEY EXISTS [%lld : %s]\n", key, value);
             }
-            find_and_print_range(root, input, range2, instruction == 'p');
+            else
+            {
+                printf("THIS KEY IS NOT FOUNDED ON DISK [%lld]\n", key);
+            }
+            free(ret_val);
+            break;
+        case 'i':
+            scanf("%lld %s", &key, value);
+            if (!db_insert(key, value))
+            {
+                printf("INSERTION SUCCEED [%lld : %s]\n", key, value);
+            }
+            else
+            {
+                printf("INSERTION FAIL [%lld]\n", key);
+            }
+            break;
+        case 'd':
+            scanf("%lld", &key);
+            if (!db_delete(key))
+            {
+                printf("DELETION SUCCEED [%lld]\n", key);
+            }
+            else
+            {
+                printf("DELETION FAIL [%lld]\n", key);
+            }
+            break;
+        case 'p':
+            printAll();
             break;
         case 'l':
-            print_leaves(root);
+            print_leaf();
             break;
         case 'q':
-            while (getchar() != (int)'\n');
-            return EXIT_SUCCESS;
-            break;
-        case 't':
-            print_tree(root);
-            break;
-        case 'v':
-            verbose_output = !verbose_output;
-            break;
-        case 'x':
-            if (root)
-                root = destroy_tree(root);
-            print_tree(root);
-            break;
-        default:
-            usage_2();
-            break;
+            free(header_page);
+            return 0;
         }
-        while (getchar() != (int)'\n');
+        while (getchar() != (int)'\n')
+            ;
         printf("> ");
     }
-    printf("\n");
-
-    return EXIT_SUCCESS;
 }
+
+// int main(void)
+// {
+
+//     header_page = (header_page_t *)malloc(page_size);
+//     char value[120] = "aa";
+//     open_table("aaa.db");
+//     for (uint64_t i = 1; i <= 10000; i++)
+//     {
+//         db_insert(i, value);
+//         printf("%lld\n", i);
+//     }
+//     print_leaf();
+//     printAll();
+//     free(header_page);
+// }
