@@ -10,8 +10,6 @@
 // GLOBALS.
 #define success 0
 #define fail 1
-#define _L -1
-#define _R 1
 /* The order determines the maximum and minimum
  * number of entries (keys and pointers) in any
  * node.  Every node has at most order - 1 keys and
@@ -136,6 +134,20 @@ void print_leaf()
     }
     free(page);
     printf("\n");
+}
+
+void free_print()
+{
+    header_read();
+    page_t *page = (page_t *)malloc(page_size);
+    file_read_page(header_page->free_page_number, page);
+    printf("%llu ", header_page->free_page_number);
+    while (page->header.parent_page_number)
+    {
+        printf("%llu ", page->header.parent_page_number);
+        file_read_page(page->header.parent_page_number, page);
+    }
+    free(page);
 }
 
 int db_insert(int64_t key, char *value)
@@ -645,6 +657,7 @@ Direction_data get_neighbor_index(page_t *page, pagenum_t pagenum)
             return d;
         }
     }
+    free(parent);
     d.data = 0;
     d.direction = -1;
     return d;
@@ -673,7 +686,7 @@ pagenum_t get_neighbor_pagenum(page_t *page, int neighbor_index)
 int64_t get_parent_key(page_t *child, int key_index)
 {
     page_t *parent = (page_t *)malloc(page_size);
-    file_write_page(child->header.parent_page_number, parent);
+    file_read_page(child->header.parent_page_number, parent);
     int64_t ret_key = parent->entries[key_index].key;
     free(parent);
     return ret_key;
@@ -712,14 +725,11 @@ page_t *remove_entry_from_node(page_t *page, pagenum_t pagenum, int64_t key)
         page->entries[i].page_number = 0;
         page->header.number_of_keys--;
     }
-    file_write_page(pagenum, page);
     return page;
 }
 
 int adjust_root(page_t *root, pagenum_t pagenum)
 {
-
-    page_t *new_root = make_node();
 
     /* Case: nonempty root.
      * Key and pointer have already been deleted,
@@ -738,25 +748,23 @@ int adjust_root(page_t *root, pagenum_t pagenum)
     // the first (only) child
     // as the new root.
     header_read();
+    page_t *new_root = make_node();
 
     header_page->root_page_number = 0;
     if (!root->header.isLeaf)
     {
         pagenum_t new_root_pagenum = root->one_more_page_number;
 
-        new_root = (page_t *)malloc(page_size);
         file_read_page(new_root_pagenum, new_root);
         new_root->header.parent_page_number = 0;
         file_write_page(new_root_pagenum, new_root);
-        free(new_root);
-
         header_page->root_page_number = new_root_pagenum;
-        header_write();
     }
 
     // If it is a leaf (has no children),
     // then the whole tree is empty.
-
+    free(new_root);
+    header_write();
     file_free_page(pagenum);
     return 0;
 }
@@ -771,7 +779,6 @@ int coalesce_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t 
 {
     int i, j, neighbor_insertion_index, n_end;
     pagenum_t parent_pagenum = page->header.parent_page_number;
-    page_t *tmp;
 
     /* Swap neighbor with node if node is on the
      * extreme left and neighbor is to its right.
@@ -784,6 +791,7 @@ int coalesce_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t 
 
     if (!page->header.isLeaf)
     {
+        page_t *child = (page_t *)malloc(page_size);
         if (direction == -1)
         {
             n_end = page->header.number_of_keys;
@@ -798,6 +806,17 @@ int coalesce_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t 
             }
             page->entries[n_end].key = k_prime;
             page->entries[n_end].page_number = neighbor->one_more_page_number;
+
+            file_read_page(page->one_more_page_number, child);
+            child->header.parent_page_number = pagenum;
+            file_write_page(page->one_more_page_number, child);
+            for (int i = 0; i < page->header.number_of_keys; i++)
+            {
+                file_read_page(page->entries[i].page_number, child);
+                child->header.parent_page_number = pagenum;
+                file_write_page(page->entries[i].page_number, child);
+            }
+
             file_free_page(neighbor_pagenum);
             file_write_page(pagenum, page);
         }
@@ -816,9 +835,21 @@ int coalesce_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t 
             neighbor->entries[neighbor_insertion_index].key = k_prime;
             neighbor->entries[neighbor_insertion_index].page_number = page->one_more_page_number;
             neighbor->header.number_of_keys++;
+
+            file_read_page(neighbor->one_more_page_number, child);
+            child->header.parent_page_number = neighbor_pagenum;
+            file_write_page(neighbor->one_more_page_number, child);
+            for (int i = 0; i < neighbor->header.number_of_keys; i++)
+            {
+                file_read_page(neighbor->entries[i].page_number, child);
+                child->header.parent_page_number = neighbor_pagenum;
+                file_write_page(neighbor->entries[i].page_number, child);
+            }
+
             file_free_page(pagenum);
             file_write_page(neighbor_pagenum, neighbor);
         }
+        free(child);
     }
 
     else
@@ -994,6 +1025,7 @@ int delete_entry(pagenum_t pagenum, int64_t key)
 
     if (page->header.number_of_keys > 0)
     {
+        file_write_page(pagenum, page);
         free(page);
         return 0;
     }

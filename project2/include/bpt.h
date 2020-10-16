@@ -85,6 +85,7 @@ void enqueue(Queue *q, pagenum_t p, int depth);
 int IsEmpty(Queue *q);
 void printAll();
 void print_leaf();
+void free_print();
 // ------------------------------------------------------ clear
 int db_insert(int64_t key, char *value);
 int db_find(int64_t key, char *ret_val);

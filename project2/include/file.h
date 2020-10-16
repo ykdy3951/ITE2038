@@ -11,11 +11,11 @@
 #define val_size 120
 #define page_size 4096
 
-#define LEAF_ORDER 5
-#define BRANCH_ORDER 5
+// #define LEAF_ORDER 5
+// #define BRANCH_ORDER 5
 
-// #define LEAF_ORDER 32
-// #define BRANCH_ORDER 249
+#define LEAF_ORDER 32
+#define BRANCH_ORDER 249
 
 typedef uint64_t pagenum_t;
 

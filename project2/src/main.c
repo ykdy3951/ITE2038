@@ -75,6 +75,10 @@ int main(int argc, char **argv)
         {
             print_leaf();
         }
+        else if (!strcmp(command, "free"))
+        {
+            free_print();
+        }
         else if (!strcmp(command, "quit"))
         {
             free(header_page);
@@ -93,13 +97,22 @@ int main(int argc, char **argv)
 
 //     header_page = (header_page_t *)malloc(page_size);
 //     char value[120] = "aa";
-//     open_table("aaa.db");
+//     open_table("aac.db");
 //     for (int64_t i = 1; i <= 10000; i++)
 //     {
 //         db_insert(i, value);
 //         printf("insert %ld\n", i);
 //     }
-//     print_leaf();
+//     // print_leaf();
+//     // printAll();
+//     // for (int64_t i = 11; i <= 9984; i++)
+//     // {
+//     //     db_delete(i);
+//     //     printf("delete %ld\n", i);
+//     // }
 //     printAll();
+//     print_leaf();
+//     free_print();
 //     free(header_page);
+//     return 0;
 // }
