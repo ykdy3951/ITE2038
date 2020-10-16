@@ -10,9 +10,10 @@
 int open_table(char *path_name)
 {
     fd = open(path_name, O_RDWR | O_SYNC | O_CREAT, 0777);
-    if (fd == error)
+    if (fd < 0)
     {
-        return fd;
+        fd = -1;
+        return error;
     }
     memset(header_page, 0, sizeof(header_page_t));
     int flag = pread(fd, header_page, page_size, 0);
@@ -21,7 +22,7 @@ int open_table(char *path_name)
         header_page->root_page_number = 0;
         header_page->free_page_number = 0;
         header_page->number_of_pages = 1;
-        header_write_page();
+        header_write();
     }
     return fd;
 }
@@ -31,7 +32,7 @@ pagenum_t file_alloc_page()
 {
     page_t *new_free;
 
-    header_read_page();
+    header_read();
 
     pagenum_t free_num = header_page->free_page_number;
     new_free = (page_t *)malloc(sizeof(page_t));
@@ -47,8 +48,8 @@ pagenum_t file_alloc_page()
         free_num = header_page->number_of_pages;
         header_page->number_of_pages++;
     }
-    header_write_page();
-    header_read_page();
+    header_write();
+    header_read();
     free(new_free);
 
     return free_num;
@@ -59,13 +60,13 @@ void file_free_page(pagenum_t pagenum)
 {
     page_t *page = (page_t *)malloc(page_size);
     memset(page, 0, page_size);
-    header_read_page();
+    header_read();
 
     page->header.parent_page_number = header_page->free_page_number;
     header_page->free_page_number = pagenum;
 
     file_write_page(pagenum, page);
-    header_write_page();
+    header_write();
     free(page);
 }
 
@@ -91,7 +92,7 @@ void file_write_page(pagenum_t pagenum, const page_t *src)
     }
 }
 
-void header_read_page()
+void header_read()
 {
     int ret;
     ret = pread(fd, header_page, page_size, 0);
@@ -101,7 +102,7 @@ void header_read_page()
     }
 }
 
-void header_write_page()
+void header_write()
 {
     int ret;
     ret = pwrite(fd, header_page, page_size, 0);

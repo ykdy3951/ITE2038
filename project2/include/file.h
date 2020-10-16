@@ -11,6 +11,9 @@
 #define val_size 120
 #define page_size 4096
 
+// #define LEAF_ORDER 5
+// #define BRANCH_ORDER 5
+
 #define LEAF_ORDER 32
 #define BRANCH_ORDER 249
 
@@ -59,18 +62,6 @@ typedef struct pageNotHeader
     };
 } page_t;
 
-// typedef struct freePage
-// {
-//     pagenum_t next_free_page_number;
-//     uint64_t not_used[511];
-// } free_page_t;
-
-// typedef union pageType
-// {
-//     page_not_header page;
-//     free_page_t free;
-// } page_t;
-
 int fd;
 
 header_page_t *header_page;
@@ -85,8 +76,8 @@ void file_read_page(pagenum_t pagenum, page_t *dest);
 
 void file_write_page(pagenum_t pagenum, const page_t *src);
 
-void header_read_page();
+void header_read();
 
-void header_write_page();
+void header_write();
 
 #endif

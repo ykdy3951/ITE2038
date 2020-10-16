@@ -1,74 +1,91 @@
 #include "bpt.h"
 #include "file.h"
 #include <inttypes.h>
+#include <string.h>
 #include <stdio.h>
 // MAIN
 
 int main(int argc, char **argv)
 {
     header_page = (header_page_t *)malloc(page_size);
-    char command;
+    fd = -1;
+    char command[10];
     int64_t key;
     char value[120];
 
-    printf("> ");
-    while (scanf("%c", &command) != EOF)
+    while (true)
     {
-        switch (command)
+        printf("> ");
+        scanf("%s", command);
+        if (!strcmp(command, "open"))
         {
-        case 'o':
             scanf("%s", value);
-            open_table(value);
-            break;
-        case 'f':
-            scanf("%lld", &key);
+            if (open_table(value) < 0)
+            {
+                printf("OPEN FAIL\n");
+            }
+            else
+            {
+                printf("OPEN SUCCEED\n");
+            }
+        }
+        else if (!strcmp(command, "insert"))
+        {
+            scanf("%ld %s", &key, value);
+            if (!db_insert(key, value))
+            {
+                printf("INSERTION SUCCEED [%ld : %s]\n", key, value);
+            }
+            else
+            {
+                printf("INSERTION FAIL [%ld]\n", key);
+            }
+        }
+        else if (!strcmp(command, "find"))
+        {
+            scanf("%ld", &key);
             char *ret_val = (char *)malloc(val_size);
             if (!db_find(key, ret_val))
             {
-                printf("THIS KEY EXISTS [%lld : %s]\n", key, value);
+                printf("THIS KEY EXISTS [%ld : %s]\n", key, ret_val);
             }
             else
             {
-                printf("THIS KEY IS NOT FOUNDED ON DISK [%lld]\n", key);
+                printf("THIS KEY IS NOT FOUNDED ON DISK [%ld]\n", key);
             }
             free(ret_val);
-            break;
-        case 'i':
-            scanf("%lld %s", &key, value);
-            if (!db_insert(key, value))
-            {
-                printf("INSERTION SUCCEED [%lld : %s]\n", key, value);
-            }
-            else
-            {
-                printf("INSERTION FAIL [%lld]\n", key);
-            }
-            break;
-        case 'd':
-            scanf("%lld", &key);
+        }
+        else if (!strcmp(command, "delete"))
+        {
+            scanf("%ld", &key);
             if (!db_delete(key))
             {
-                printf("DELETION SUCCEED [%lld]\n", key);
+                printf("DELETION SUCCEED [%ld]\n", key);
             }
             else
             {
-                printf("DELETION FAIL [%lld]\n", key);
+                printf("DELETION FAIL [%ld]\n", key);
             }
-            break;
-        case 'p':
+        }
+        else if (!strcmp(command, "print"))
+        {
             printAll();
-            break;
-        case 'l':
+        }
+        else if (!strcmp(command, "leaf"))
+        {
             print_leaf();
-            break;
-        case 'q':
+        }
+        else if (!strcmp(command, "quit"))
+        {
             free(header_page);
             return 0;
         }
-        while (getchar() != (int)'\n')
-            ;
-        printf("> ");
+        else
+        {
+            printf("Please enter the correct command\n");
+        }
     }
+    return 0;
 }
 
 // int main(void)
@@ -77,10 +94,10 @@ int main(int argc, char **argv)
 //     header_page = (header_page_t *)malloc(page_size);
 //     char value[120] = "aa";
 //     open_table("aaa.db");
-//     for (uint64_t i = 1; i <= 10000; i++)
+//     for (int64_t i = 1; i <= 10000; i++)
 //     {
 //         db_insert(i, value);
-//         printf("%lld\n", i);
+//         printf("insert %ld\n", i);
 //     }
 //     print_leaf();
 //     printAll();
