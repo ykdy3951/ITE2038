@@ -61,7 +61,7 @@ void file_free_page(pagenum_t pagenum)
     page_t *page = (page_t *)malloc(page_size);
     memset(page, 0, page_size);
     header_read();
-
+    page->header.isLeaf = -1;
     page->header.parent_page_number = header_page->free_page_number;
     header_page->free_page_number = pagenum;
 

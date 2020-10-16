@@ -43,6 +43,12 @@ typedef struct Queue
     int count;
 } Queue;
 
+typedef struct Direction_data
+{
+    int data;
+    int direction;
+} Direction_data;
+
 /* Type representing a node in the B+ tree.
  * This type is general enough to serve for both
  * the leaf and the internal node.
@@ -105,10 +111,10 @@ int start_new_tree(record_t *record);
 
 // Deletion.
 
-int get_neighbor_index(page_t *page, pagenum_t pagenum);
+Direction_data get_neighbor_index(page_t *page, pagenum_t pagenum);
 int adjust_root(page_t *root, pagenum_t pagenum);
-page_t *remove_entry_from_node(page_t *page, int64_t key);
-int coalesce_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t neighbor_pagenum, int neighbor_index, int64_t k_prime);
+page_t *remove_entry_from_node(page_t *page, pagenum_t pagenum, int64_t key);
+int coalesce_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t neighbor_pagenum, int neighbor_index, int direction, int64_t k_prime);
 int redistribute_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t neighbor_pagenum, int neighbor_index,
                        int k_prime_index, int64_t k_prime);
 int delete_entry(pagenum_t pagenum, int64_t key);
