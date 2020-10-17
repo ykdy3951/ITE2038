@@ -97,7 +97,7 @@ int main(int argc, char **argv)
 
 //     header_page = (header_page_t *)malloc(page_size);
 //     char value[120] = "aa";
-//     open_table("aac.db");
+//     open_table("aag.db");
 //     for (int64_t i = 1; i <= 10000; i++)
 //     {
 //         db_insert(i, value);
@@ -105,11 +105,19 @@ int main(int argc, char **argv)
 //     }
 //     // print_leaf();
 //     // printAll();
-//     // for (int64_t i = 11; i <= 9984; i++)
-//     // {
-//     //     db_delete(i);
-//     //     printf("delete %ld\n", i);
-//     // }
+//     for (int64_t i = 11; i <= 10000; i++)
+//     {
+//         if (db_find(10000, value))
+//         {
+//             printf("%d\n\n\n", i);
+//             break;
+//         }
+//         if (db_delete(i))
+//         {
+//             printf("1\n");
+//         }
+//         printf("delete %ld\n", i);
+//     }
 //     printAll();
 //     print_leaf();
 //     free_print();

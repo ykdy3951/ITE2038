@@ -93,7 +93,7 @@ void printAll()
                 enqueue(&q, page->entries[i].page_number, d.depth + 1);
                 printf("%ld ", page->entries[i].key);
             }
-            printf("(%ld) ", d.pagenum);
+            printf("(%ld %ld) ", d.pagenum, page->header.parent_page_number);
             printf("| ");
         }
         else
@@ -102,7 +102,7 @@ void printAll()
             {
                 printf("(%ld %s) ", page->records[i].key, page->records[i].value);
             }
-            printf("(%ld) ", d.pagenum);
+            printf("(%ld %ld) ", d.pagenum, page->header.parent_page_number);
             printf("| ");
         }
     }
@@ -802,10 +802,10 @@ int coalesce_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t 
                 page->entries[i].key = neighbor->entries[j].key;
                 page->entries[i].page_number = neighbor->entries[j].page_number;
                 page->header.number_of_keys++;
-                neighbor->header.number_of_keys--;
             }
             page->entries[n_end].key = k_prime;
             page->entries[n_end].page_number = neighbor->one_more_page_number;
+            page->header.number_of_keys++;
 
             file_read_page(page->one_more_page_number, child);
             child->header.parent_page_number = pagenum;
@@ -830,7 +830,6 @@ int coalesce_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t 
                 neighbor->entries[i].key = page->entries[j].key;
                 neighbor->entries[i].page_number = page->entries[j].page_number;
                 neighbor->header.number_of_keys++;
-                page->header.number_of_keys--;
             }
             neighbor->entries[neighbor_insertion_index].key = k_prime;
             neighbor->entries[neighbor_insertion_index].page_number = page->one_more_page_number;
@@ -1044,10 +1043,12 @@ int delete_entry(pagenum_t pagenum, int64_t key)
     Direction_data d = get_neighbor_index(page, pagenum);
     int neighbor_index = d.data;
     int direction = d.direction;
+    // printf("[direction] %d %d\n", d.data, d.direction);
     int k_prime_index = direction == -1 ? 0 : neighbor_index + 1;
     int64_t k_prime = get_parent_key(page, k_prime_index);
-
+    // printf("[k_prime] %ld\n", k_prime);
     pagenum_t neighbor_pagenum = get_neighbor_pagenum(page, neighbor_index);
+    // printf("[neighbor pagenum] %lu\n", neighbor_pagenum);
     page_t *neighbor = (page_t *)malloc(page_size);
 
     file_read_page(neighbor_pagenum, neighbor);
