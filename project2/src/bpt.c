@@ -147,6 +147,7 @@ void free_print()
         printf("%llu ", page->header.parent_page_number);
         file_read_page(page->header.parent_page_number, page);
     }
+    printf("\n");
     free(page);
 }
 
@@ -345,10 +346,15 @@ int get_left_index(page_t *parent, pagenum_t left_pagenum)
 {
 
     int left_index = 0;
-    while (left_index < parent->header.number_of_keys &&
-           parent->entries[left_index].page_number != left_pagenum)
+    while (left_index < parent->header.number_of_keys)
+    {
+        if (parent->entries[left_index].page_number == left_pagenum)
+        {
+            return left_index;
+        }
         left_index++;
-    return left_index;
+    }
+    return -1;
 }
 
 /* Inserts a new pointer to a record and its corresponding
@@ -514,6 +520,18 @@ int insert_into_node_after_splitting(page_t *old_page, pagenum_t old_pagenum, in
         new_page->entries[j].page_number = temp_branch[i].page_number;
         new_page->header.number_of_keys++;
     }
+
+    for (int i = 0; i < old_page->header.number_of_keys; i++)
+    {
+        file_read_page(old_page->entries[i].page_number, temp_page);
+        temp_page->header.parent_page_number = old_pagenum;
+        file_write_page(old_page->entries[i].page_number, temp_page);
+    }
+
+    file_read_page(new_page->one_more_page_number, temp_page);
+    temp_page->header.parent_page_number = new_pagenum;
+    file_write_page(new_page->one_more_page_number, temp_page);
+
     for (int i = 0; i < new_page->header.number_of_keys; i++)
     {
         file_read_page(new_page->entries[i].page_number, temp_page);
@@ -892,20 +910,19 @@ int coalesce_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t 
  * small node's entries without exceeding the
  * maximum
  */
-int redistribute_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t neighbor_pagenum, int neighbor_index,
-                       int k_prime_index, int64_t k_prime)
+int redistribute_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t neighbor_pagenum, int neighbor_index, int direction, int k_prime_index, int64_t k_prime)
 {
 
     int i;
     page_t *parent = (page_t *)malloc(page_size);
+    page_t *temp_page = (page_t *)malloc(page_size);
     file_read_page(page->header.parent_page_number, parent);
-
     /* Case: n has a neighbor to the left. 
      * Pull the neighbor's last key-pointer pair over
      * from the neighbor's right end to n's left end.
      */
 
-    if (neighbor_index != -1)
+    if (direction != -1)
     {
         if (!page->header.isLeaf)
         {
@@ -919,6 +936,11 @@ int redistribute_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenu
 
             page->one_more_page_number = neighbor->entries[neighbor->header.number_of_keys - 1].page_number;
             parent->entries[k_prime_index].key = neighbor->entries[neighbor->header.number_of_keys - 1].key;
+
+            file_read_page(page->one_more_page_number, temp_page);
+            temp_page->header.parent_page_number = pagenum;
+            file_write_page(page->one_more_page_number, temp_page);
+
             neighbor->entries[neighbor->header.number_of_keys - 1].page_number = 0;
             neighbor->entries[neighbor->header.number_of_keys - 1].key = 0;
         }
@@ -934,7 +956,6 @@ int redistribute_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenu
             strcpy(page->records[0].value, neighbor->records[neighbor->header.number_of_keys - 1].value);
 
             neighbor->records[neighbor->header.number_of_keys - 1].key = 0;
-            // strcpy(neighbor->records[neighbor->header.number_of_keys - 1].value, 0);
 
             parent->entries[k_prime_index].key = page->records[0].key;
         }
@@ -952,6 +973,10 @@ int redistribute_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenu
         {
             page->entries[page->header.number_of_keys].key = k_prime;
             page->entries[page->header.number_of_keys].page_number = neighbor->one_more_page_number;
+
+            file_read_page(page->entries[page->header.number_of_keys].page_number, temp_page);
+            temp_page->header.parent_page_number = pagenum;
+            file_write_page(page->entries[page->header.number_of_keys].page_number, temp_page);
 
             parent->entries[k_prime_index].key = neighbor->entries[0].key;
             neighbor->one_more_page_number = neighbor->entries[0].page_number;
@@ -1052,12 +1077,15 @@ int delete_entry(pagenum_t pagenum, int64_t key)
     page_t *neighbor = (page_t *)malloc(page_size);
 
     file_read_page(neighbor_pagenum, neighbor);
+
+    int size = page->header.isLeaf ? leaf_order : branch_order - 1;
+
     /* Coalescence. */
+    if (neighbor->header.number_of_keys < size)
+        return coalesce_nodes(page, pagenum, neighbor, neighbor_pagenum, neighbor_index, direction, k_prime);
 
-    return coalesce_nodes(page, pagenum, neighbor, neighbor_pagenum, neighbor_index, direction, k_prime);
+    /* Redistribution. */
 
-    // // /* Redistribution. */
-
-    // else
-    //     return redistribute_nodes(page, pagenum, neighbor, neighbor_pagenum, neighbor_index, k_prime_index, k_prime);
+    else
+        return redistribute_nodes(page, pagenum, neighbor, neighbor_pagenum, neighbor_index, direction, k_prime_index, k_prime);
 }

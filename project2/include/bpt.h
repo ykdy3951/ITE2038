@@ -116,7 +116,7 @@ Direction_data get_neighbor_index(page_t *page, pagenum_t pagenum);
 int adjust_root(page_t *root, pagenum_t pagenum);
 page_t *remove_entry_from_node(page_t *page, pagenum_t pagenum, int64_t key);
 int coalesce_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t neighbor_pagenum, int neighbor_index, int direction, int64_t k_prime);
-int redistribute_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t neighbor_pagenum, int neighbor_index,
+int redistribute_nodes(page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t neighbor_pagenum, int neighbor_index, int direction,
                        int k_prime_index, int64_t k_prime);
 int delete_entry(pagenum_t pagenum, int64_t key);
 
