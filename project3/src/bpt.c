@@ -160,12 +160,14 @@ void free_print(int table_id)
 
 int db_insert(int table_id, int64_t key, char *value)
 {
+    // buffer가 없는 경우 종료
     if (buf == NULL)
     {
         printf("[ERROR] YOU HAVE TO OPEN THE EXISTING DATA FILE.\n");
         return fail;
     }
 
+    // 해당 키를 찾아서 있으면 종료
     char *tmp_val = (char *)malloc(val_size);
     if (db_find(table_id, key, tmp_val) == success)
     {
@@ -176,10 +178,12 @@ int db_insert(int table_id, int64_t key, char *value)
 
     record_t *new_record = make_record(key, value);
 
-    header_page_t *header_page = (header_page_t *)malloc(page_size);
-    buf_read_page(table_id, 0, header_page);
+    header_page_t *header_page;
+    int header_idx = buf_read_page(table_id, 0);
+    header_page = buf[header_idx].header_page;
+
     pagenum_t root_pagenum = header_page->root_page_number;
-    free(header_page);
+    buf_write_page(header_idx);
 
     if (root_pagenum == 0)
     {
@@ -191,18 +195,20 @@ int db_insert(int table_id, int64_t key, char *value)
 
     // tree 내부에 저장하는 방법
     // 1. 일단
-    page_t *leaf_page = (page_t *)malloc(page_size);
-    buf_read_page(table_id, pagenum, leaf_page);
+    page_t *leaf_page;
+    int leaf_page_idx = buf_read_page(table_id, pagenum);
+    leaf_page = buf[leaf_page_idx].page;
+
     int ret;
     if (leaf_page->header.number_of_keys < leaf_order - 1)
     {
-        ret = insert_into_leaf(table_id, leaf_page, pagenum, new_record);
+        ret = insert_into_leaf(table_id, leaf_page_idx, new_record);
     }
 
     // 2. splitting 구현
     else
     {
-        ret = insert_into_leaf_after_splitting(table_id, leaf_page, pagenum, new_record);
+        ret = insert_into_leaf_after_splitting(table_id, leaf_page_idx, new_record);
     }
     return ret;
 }
@@ -214,22 +220,25 @@ int db_find(int table_id, int64_t key, char *ret_val)
         printf("[ERROR] YOU HAVE TO OPEN THE EXISTING DATA FILE.\n");
         return fail;
     }
-    page_t *page = (page_t *)malloc(page_size);
+
+    page_t *page;
+
     pagenum_t pagenum = find_leaf(table_id, key);
     if (pagenum == 0)
     {
         free(page);
         return fail;
     }
-    buf_read_page(table_id, pagenum, page);
 
+    int page_idx = buf_read_page(table_id, pagenum);
+    page = buf[page_idx].page;
     int i;
     for (i = 0; i < page->header.number_of_keys; i++)
     {
         if (page->records[i].key == key)
         {
             strcpy(ret_val, page->records[i].value);
-            free(page);
+            buf_write_page(page_idx);
             return success;
         }
         else if (page->records[i].key > key)
@@ -237,7 +246,7 @@ int db_find(int table_id, int64_t key, char *ret_val)
             break;
         }
     }
-    free(page);
+    buf_write_page(page_idx);
     return fail;
 }
 
@@ -273,17 +282,22 @@ int db_delete(int table_id, int64_t key)
  */
 pagenum_t find_leaf(int table_id, int64_t key)
 {
-    header_page_t *header_page = (header_page_t *)malloc(page_size);
-    buf_read_page(table_id, 0, header_page);
+    header_page_t *header_page;
+    int header_idx = buf_read_page(table_id);
+    header_page = buf[header_idx].header_page;
+
     if (header_page->number_of_pages <= 1)
     {
-        free(header_page);
+        buf_write_page(header_idx);
         return 0;
     }
-    page_t *page = (page_t *)malloc(page_size);
+    page_t *page;
     pagenum_t pagenum = header_page->root_page_number;
-    free(header_page);
-    buf_read_page(table_id, pagenum, page);
+
+    int page_idx = buf_read_page(table_id, pagenum);
+    page = buf[page_idx].page;
+
+    buf_write_page(header_idx);
 
     while (!page->header.isLeaf)
     {
@@ -298,15 +312,25 @@ pagenum_t find_leaf(int table_id, int64_t key)
         if (i == 0)
         {
             pagenum = page->one_more_page_number;
-            buf_read_page(table_id, pagenum, page);
+
+            // 사용이 끝났으므로 pin을 내려주고 LRU를 변경한다.
+            buf_write_page(page_idx);
+
+            page_idx = buf_read_page(table_id, pagenum);
+            page = buf[page_idx].page;
         }
         else
         {
             pagenum = page->entries[i - 1].page_number;
-            buf_read_page(table_id, pagenum, page);
+
+            // 사용이 끝났으므로 pin을 내려주고 LRU를 변경한다.
+            buf_write_page(page_idx);
+
+            page_idx = buf_read_page(table_id, pagenum);
+            page = buf[page_idx].page;
         }
     }
-    free(page);
+    buf_write_page(page_idx);
     return pagenum;
 }
 
@@ -378,11 +402,11 @@ int get_left_index(page_t *parent, pagenum_t left_pagenum)
  * key into a leaf.
  * Returns the altered leaf.
  */
-int insert_into_leaf(int table_id, page_t *leaf, pagenum_t pagenum, record_t *new_record)
+int insert_into_leaf(int table_id, int leaf_idx, record_t *new_record)
 {
 
     int i, insertion_point;
-
+    page_t *leaf = buf[leaf_idx].page;
     insertion_point = 0;
     while (insertion_point < leaf->header.number_of_keys && leaf->records[insertion_point].key < new_record->key)
         insertion_point++;
@@ -396,8 +420,9 @@ int insert_into_leaf(int table_id, page_t *leaf, pagenum_t pagenum, record_t *ne
     strcpy(leaf->records[insertion_point].value, new_record->value);
     leaf->header.number_of_keys++;
 
-    buf_write_page(table_id, pagenum, leaf);
-    free(leaf);
+    buf[leaf_idx].is_dirty = 1;
+
+    buf_write_page(leaf_idx);
     free(new_record);
     return 0;
 }
@@ -407,17 +432,22 @@ int insert_into_leaf(int table_id, page_t *leaf, pagenum_t pagenum, record_t *ne
  * the tree's order, causing the leaf to be split
  * in half.
  */
-int insert_into_leaf_after_splitting(int table_id, page_t *leaf, pagenum_t pagenum, record_t *new_record)
+int insert_into_leaf_after_splitting(int table_id, int leaf_idx, record_t *new_record)
 {
+    // 필요한 변수들 생성
     int ret;
-    page_t *new_leaf;
+    page_t *leaf, *new_leaf;
     int insertion_index, split, i, j;
     int64_t new_key;
 
+    // new_leaf 생성
     new_leaf = make_leaf();
 
+    // 임시 record 생성
     record_t *temp_records = (record_t *)malloc(leaf_order * sizeof(record_t));
+    leaf = buf[leaf_idx].page;
 
+    // 하나에 전부 넣음
     insertion_index = 0;
     while (insertion_index < leaf_order - 1 && leaf->records[insertion_index].key < new_record->key)
         insertion_index++;
@@ -435,6 +465,7 @@ int insert_into_leaf_after_splitting(int table_id, page_t *leaf, pagenum_t pagen
 
     leaf->header.number_of_keys = 0;
 
+    // 재분배
     split = cut(leaf_order - 1);
 
     for (i = 0; i < split; i++)
@@ -453,15 +484,22 @@ int insert_into_leaf_after_splitting(int table_id, page_t *leaf, pagenum_t pagen
     free(new_record);
     free(temp_records);
 
+    // leaf 끼리 연결하기
     new_leaf->right_sibling_number = leaf->right_sibling_number;
     new_leaf->header.parent_page_number = leaf->header.parent_page_number;
 
-    pagenum_t new_pagenum = buf_alloc_page(table_id);
-    leaf->right_sibling_number = new_pagenum;
+    int new_leaf_idx = buf_alloc_page(table_id);
+    memcpy(buf[new_leaf_idx].page, new_leaf, page_size);
+    leaf->right_sibling_number = buf[new_leaf_idx].page_num;
 
     new_key = new_leaf->records[0].key;
 
-    ret = insert_into_parent(table_id, leaf, pagenum, new_key, new_leaf, new_pagenum);
+    buf[leaf_idx].is_dirty = 1;
+    buf[new_leaf_idx].is_dirty = 1;
+
+    free(new_leaf);
+
+    ret = insert_into_parent(table_id, leaf_idx, new_key, new_leaf_idx);
 
     return ret;
 }
@@ -470,10 +508,11 @@ int insert_into_leaf_after_splitting(int table_id, page_t *leaf, pagenum_t pagen
  * into a node into which these can fit
  * without violating the B+ tree properties.
  */
-int insert_into_node(int table_id, page_t *parent, pagenum_t parent_pagenum,
+int insert_into_node(int table_id, int parent_idx,
                      int left_index, int64_t key, pagenum_t right_pagenum)
 {
     int i;
+    page_t *parent = buf[parent_idx].page;
     for (i = parent->header.number_of_keys - 1; i > left_index; i--)
     {
         parent->entries[i + 1].key = parent->entries[i].key;
@@ -483,8 +522,9 @@ int insert_into_node(int table_id, page_t *parent, pagenum_t parent_pagenum,
     parent->entries[left_index + 1].page_number = right_pagenum;
     parent->header.number_of_keys++;
 
-    buf_write_page(table_id, parent_pagenum, parent);
-    free(parent);
+    buf[parent_idx].is_dirty = 1;
+
+    buf_write_page(parent_idx);
     return 0;
 }
 
@@ -492,19 +532,23 @@ int insert_into_node(int table_id, page_t *parent, pagenum_t parent_pagenum,
  * into a node, causing the node's size to exceed
  * the order, and causing the node to split into two.
  */
-int insert_into_node_after_splitting(int table_id, page_t *old_page, pagenum_t old_pagenum, int left_index,
+int insert_into_node_after_splitting(int table_id, int old_idx, int left_index,
                                      int64_t key, pagenum_t right_pagenum)
 {
     int ret;
     int i, j, split, k_prime;
+    int temp_idx;
     branch_factor_t *temp_branch;
+    page_t *old_page;
     page_t *new_page;
-    page_t *temp_page;
-    pagenum_t new_pagenum = buf_alloc_page(table_id);
+    int new_page_idx = buf_alloc_page(table_id);
+    pagenum_t old_pagenum = buf[old_idx].page_num;
+    pagenum_t new_pagenum = buf[new_page_idx].page_num;
 
-    temp_page = (page_t *)malloc(page_size);
+    old_page = buf[old_idx].page;
     temp_branch = (branch_factor_t *)malloc(branch_order * sizeof(branch_factor_t));
 
+    // 한곳으로 모두 모은다.
     for (i = 0, j = 0; i < old_page->header.number_of_keys; i++, j++)
     {
         if (j == left_index + 1)
@@ -538,52 +582,65 @@ int insert_into_node_after_splitting(int table_id, page_t *old_page, pagenum_t o
         new_page->header.number_of_keys++;
     }
 
+    // child의 parent 바꿔주는 코드
+    // 기존의 page
     for (int i = 0; i < old_page->header.number_of_keys; i++)
     {
-        buf_read_page(table_id, old_page->entries[i].page_number, temp_page);
-        temp_page->header.parent_page_number = old_pagenum;
-        buf_write_page(table_id, old_page->entries[i].page_number, temp_page);
+        temp_idx = buf_read_page(table_id, old_page->entries[i].page_number);
+        buf[temp_idx].page->header.parent_page_number = old_pagenum;
+
+        buf[temp_idx].is_dirty = 1;
+        buf_write_page(temp_idx);
     }
 
-    buf_read_page(table_id, new_page->one_more_page_number, temp_page);
-    temp_page->header.parent_page_number = new_pagenum;
-    buf_write_page(table_id, new_page->one_more_page_number, temp_page);
+    // 새로운 page
+    temp_idx = buf_read_page(table_id, new_page->one_more_page_number);
+    buf[temp_idx].page->header.parent_page_number = new_pagenum;
+    buf[temp_idx].is_dirty = 1;
+    buf_write_page(temp_idx);
 
     for (int i = 0; i < new_page->header.number_of_keys; i++)
     {
-        buf_read_page(table_id, new_page->entries[i].page_number, temp_page);
-        temp_page->header.parent_page_number = new_pagenum;
-        buf_write_page(table_id, new_page->entries[i].page_number, temp_page);
+        int temp_idx = buf_read_page(table_id, new_page->entries[i].page_number);
+        buf[temp_idx].page->header.parent_page_number = new_pagenum;
+
+        buf[temp_idx].is_dirty = 1;
+        buf_write_page(temp_idx);
     }
-    free(temp_page);
-    free(temp_branch);
     new_page->header.parent_page_number = old_page->header.parent_page_number;
 
-    ret = insert_into_parent(table_id, old_page, old_pagenum, k_prime, new_page, new_pagenum);
+    // 그후 buffer에 넣어주고 free 시켜준다.
+    memcpy(buf[new_page_idx].page, new_page, page_size);
+
+    // free 처리
+    free(temp_branch);
+    free(new_page);
+
+    ret = insert_into_parent(table_id, old_idx, k_prime, new_page_idx);
     return ret;
 }
 
 /* Inserts a new node (leaf or internal node) into the B+ tree.
  * Returns the root of the tree after insertion.
  */
-int insert_into_parent(int table_id, page_t *left, pagenum_t left_pagenum, int64_t key, page_t *right, pagenum_t right_pagenum)
+int insert_into_parent(int table_id, int left_idx, int64_t key, int right_idx)
 {
 
     int left_index, ret;
-    pagenum_t parent_pagenum = left->header.parent_page_number;
-
+    pagenum_t parent_pagenum = buf[left_idx].page->header.parent_page_number;
+    pagenum_t right_pagenum = buf[right_idx].page_num;
     /* Case: new root. */
     if (parent_pagenum == 0)
     {
-        ret = insert_into_new_root(table_id, left, left_pagenum, key, right, right_pagenum);
+        ret = insert_into_new_root(table_id, left_idx, key, right_idx);
         return ret;
     }
 
     /* Case: leaf or node. (Remainder of
      * function body.)  
      */
-    page_t *parent = (page_t *)malloc(page_size);
-    buf_read_page(table_id, left->header.parent_page_number, parent);
+    int parent_idx = buf_read_page(table_id, parent_pagenum);
+    page_t *parent = buf[parent_idx].page;
 
     /* Find the parent's pointer to the left 
      * node.
@@ -591,15 +648,13 @@ int insert_into_parent(int table_id, page_t *left, pagenum_t left_pagenum, int64
     /* Simple case: the new key fits into the node. 
      */
 
-    left_index = get_left_index(parent, left_pagenum);
-    buf_write_page(table_id, right_pagenum, right);
-    buf_write_page(table_id, left_pagenum, left);
-    free(left);
-    free(right);
+    left_index = get_left_index(parent, buf[left_idx].page_num);
+    buf_write_page(left_idx);
+    buf_write_page(right_idx);
 
     if (parent->header.number_of_keys < branch_order - 1)
     {
-        ret = insert_into_node(table_id, parent, parent_pagenum, left_index, key, right_pagenum);
+        ret = insert_into_node(table_id, parent_idx, left_index, key, right_pagenum);
     }
 
     /* Harder case:  split a node in order 
@@ -607,7 +662,7 @@ int insert_into_parent(int table_id, page_t *left, pagenum_t left_pagenum, int64
      */
     else
     {
-        ret = insert_into_node_after_splitting(table_id, parent, parent_pagenum, left_index, key, right_pagenum);
+        ret = insert_into_node_after_splitting(table_id, parent_idx, left_index, key, right_pagenum);
     }
     return ret;
 }
@@ -616,34 +671,40 @@ int insert_into_parent(int table_id, page_t *left, pagenum_t left_pagenum, int64
  * and inserts the appropriate key into
  * the new root.
  */
-int insert_into_new_root(int table_id, page_t *left, pagenum_t left_pagenum, int64_t key, page_t *right, pagenum_t right_pagenum)
+int insert_into_new_root(int table_id, int left_idx, int64_t key, int right_idx)
 {
-    header_page_t *header_page = (header_page_t *)malloc(page_size);
-    buf_read_page(table_id, 0, header_page);
+    header_page_t *header_page;
+    int header_idx = buf_read_page(table_id, 0);
+    header_page = buf[header_idx].header_page;
 
     page_t *root = make_node();
+    int root_idx = buf_alloc_page(table_id);
+    pagenum_t root_pagenum = buf[root_idx].page_num;
 
-    pagenum_t root_pagenum = buf_alloc_page(table_id);
-    root->one_more_page_number = left_pagenum;
-
+    // root 처리
+    root->one_more_page_number = buf[left_idx].page_num;
     root->entries[0].key = key;
-    root->entries[0].page_number = right_pagenum;
+    root->entries[0].page_number = buf[right_idx].page_num;
     root->header.number_of_keys++;
     root->header.parent_page_number = 0;
+    memcpy(buf[root_idx].page, root, page_size);
+    buf[root_idx].is_dirty = 1;
 
-    left->header.parent_page_number = root_pagenum;
-    right->header.parent_page_number = root_pagenum;
-
+    // header 처리
     header_page->root_page_number = root_pagenum;
+    buf[header_idx].is_dirty = 1;
 
-    buf_write_page(table_id, 0, header_page);
-    buf_write_page(table_id, right_pagenum, right);
-    buf_write_page(table_id, left_pagenum, left);
-    buf_write_page(table_id, root_pagenum, root);
+    // child들 처리
+    buf[left_idx].page->header.parent_page_number = root_pagenum;
+    buf[right_idx].page->header.parent_page_number = root_pagenum;
+    buf[left_idx].is_dirty = 1;
+    buf[right_idx].is_dirty = 1;
 
-    free(header_page);
-    free(left);
-    free(right);
+    buf_write_page(header_idx);
+    buf_write_page(root_idx);
+    buf_write_page(left_idx);
+    buf_write_page(right_idx);
+
     free(root);
 
     return 0;
@@ -654,22 +715,28 @@ int insert_into_new_root(int table_id, page_t *left, pagenum_t left_pagenum, int
  */
 int start_new_tree(int table_id, record_t *record)
 {
-    header_page_t *header_page = (header_page_t *)malloc(page_size);
-    buf_read_page(table_id, 0, header_page);
+    header_page_t *header_page;
+    int header_idx = buf_read_page(table_id, 0);
+    header_page = buf[header_idx].header_page;
 
     page_t *root = make_leaf();
-    pagenum_t pagenum = buf_alloc_page(table_id);
+    int root_idx = buf_alloc_page(table_id);
+
     root->records[0].key = record->key;
     strcpy(root->records[0].value, record->value);
+
     root->header.number_of_keys++;
-    header_page->root_page_number = pagenum;
+    header_page->root_page_number = buf[root_idx].page_num;
 
-    buf_write_page(table_id, pagenum, root);
-    buf_write_page(table_id, 0, header_page);
+    memcpy(buf[root_idx].page, root, page_size);
 
-    free(header_page);
-    free(record);
+    buf[header_idx].is_dirty = 1;
+    buf[root_idx].is_dirty = 1;
+
+    buf_write_page(root_idx);
+    buf_write_page(header_idx);
     free(root);
+
     return 0;
 }
 

@@ -99,15 +99,15 @@ record_t *make_record(int64_t key, char *value);
 page_t *make_node(void);
 page_t *make_leaf(void);
 int get_left_index(page_t *parent, pagenum_t left_pagenum);
-int insert_into_leaf(int table_id, page_t *leaf, pagenum_t pagenum, record_t *new_record);
-int insert_into_leaf_after_splitting(int table_id, page_t *leaf, pagenum_t pagenum,
+int insert_into_leaf(int table_id, int leaf_idx, record_t *new_record);
+int insert_into_leaf_after_splitting(int table_id, int leaf_idx,
                                      record_t *new_record);
-int insert_into_node(int table_id, page_t *parent, pagenum_t parent_pagenum,
+int insert_into_node(int table_id, int parent_idx,
                      int left_index, int64_t key, pagenum_t right_pagenum);
-int insert_into_node_after_splitting(int table_id, page_t *old_page, pagenum_t old_pagenum, int left_index,
+int insert_into_node_after_splitting(int table_id, int old_idx, int left_index,
                                      int64_t key, pagenum_t right_pagenum);
-int insert_into_parent(int table_id, page_t *left, pagenum_t left_pagenum, int64_t key, page_t *right, pagenum_t right_pagenum);
-int insert_into_new_root(int table_id, page_t *left, pagenum_t left_pagenum, int64_t key, page_t *right, pagenum_t right_pagenum);
+int insert_into_parent(int table_id, int leaf_idx, int64_t key, int right_idx);
+int insert_into_new_root(int table_id, int left_idx, int64_t key, int right_idx);
 int start_new_tree(int table_id, record_t *record);
 
 // Deletion.

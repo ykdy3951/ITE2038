@@ -10,6 +10,7 @@
 
 int open_table(char *path_name)
 {
+    // table이 없으면 새로 만든다.
     if (table == NULL)
     {
         table = (table_t *)malloc(sizeof(table_t));
@@ -25,20 +26,38 @@ int open_table(char *path_name)
         }
     }
 
+    // 기존의 table인 경우
+    for (int i = 1; i <= table->num_of_table; i++)
+    {
+        if (!strcmp(table->table_path, path_name))
+        {
+            return i;
+        }
+    }
+
+    // table이 10개 이상이면 증가 시킨다.
     if (table->num_of_table >= 10)
     {
         return error;
     }
 
+    // 그렇지 않을 경우 page를 새로 만든다.
     int fd = open(path_name, O_RDWR | O_SYNC | O_CREAT, 0777);
     if (fd < 0)
     {
         fd = -1;
         return error;
     }
+    // mapping table에 등록하기
+    int ret = ++table->num_of_table;
+    table->fd_table[ret] = fd;
+    table->table_path[ret] = (char *)malloc(sizeof(char) * strlen(path_name));
+
     header_page_t *header_page = (header_page_t *)malloc(page_size);
     memset(header_page, 0, sizeof(header_page_t));
     int flag = pread(fd, header_page, page_size, 0);
+
+    // 새로 만들기
     if (flag != page_size || !header_page->number_of_pages)
     {
         header_page->root_page_number = 0;
@@ -47,7 +66,7 @@ int open_table(char *path_name)
         file_write_page(fd, 0, (page_t *)header_page);
     }
     free(header_page);
-    return fd;
+    return ret;
 }
 
 // Allocate an on-disk page from the free page list

@@ -1,7 +1,9 @@
 #include "buf.h"
 #include <string.h>
 #include <stdlib.h>
-
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
 // Initialize buffer pool with given number and buffer manager.
 int init_db(int num_buf)
 {
@@ -37,10 +39,6 @@ int init_db(int num_buf)
     }
 
     return 0;
-}
-
-int open_table(char *pathname)
-{
 }
 
 int close_table(int table_id)
@@ -207,6 +205,8 @@ int buf_get_page(int buffer_index, int table_id, pagenum_t pagenum)
         buf[buffer_index].table_id = table_id;
         buf[buffer_index].page_num = pagenum;
     }
+
+    return 0;
 }
 
 //buf에서 file에 쓰는 함수
@@ -226,6 +226,8 @@ int buf_put_page(int index)
         buf_init(index);
         buf[index].page = NULL;
     }
+
+    return 0;
 }
 
 // buffer 사용이 끝났음을 알리는 함수 pin을 뽑고 LRU 처리도 하는 함수
@@ -348,11 +350,17 @@ int buf_alloc_page(int table_id)
     int free_idx;
     pagenum_t free_num = buf[header_idx].header_page->free_page_number;
 
+    // free page가 있을 경우
     if (free_num)
     {
         free_idx = buf_read_page(table_id, free_num);
         buf[header_idx].header_page->free_page_number = buf[free_idx].page->header.parent_page_number;
+
+        buf[free_idx].table_id = table_id;
+        buf[free_idx].page_num = free_num;
     }
+
+    // 없는 경우
     else
     {
         free_num = buf[header_idx].header_page->number_of_pages;
@@ -388,6 +396,8 @@ int buf_alloc_page(int table_id)
             buf_init(free_idx);
             buf[free_idx].page_num = free_num;
             buf[free_idx].table_id = table_id;
+            buf[free_idx].page = (page_t *)malloc(page_size);
+            memcpy(buf[free_idx].page, 0, page_size);
             // buf_get_page(free_idx, table_id, pagenum);
             LRU_func(free_idx);
         }
@@ -404,6 +414,8 @@ int buf_alloc_page(int table_id)
             buf_init(free_idx);
             buf[free_idx].page_num = free_num;
             buf[free_idx].table_id = table_id;
+            buf[free_idx].page = (page_t *)malloc(page_size);
+            memcpy(buf[free_idx].page, 0, page_size);
             // buf_get_page(free_idx, table_id, pagenum);
 
             buf[free_idx].prev = -1;
