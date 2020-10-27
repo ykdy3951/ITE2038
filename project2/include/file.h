@@ -62,7 +62,7 @@ typedef struct pageNotHeader
     };
 } page_t;
 
-int fd;
+int fd = -1;
 
 header_page_t *header_page;
 

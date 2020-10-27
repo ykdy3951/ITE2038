@@ -7,8 +7,6 @@
 
 int main(int argc, char **argv)
 {
-    header_page = (header_page_t *)malloc(page_size);
-    fd = -1;
     char command[10];
     int64_t key;
     char value[120];
@@ -81,7 +79,8 @@ int main(int argc, char **argv)
         }
         else if (!strcmp(command, "quit"))
         {
-            free(header_page);
+            if (header_page != NULL)
+                free(header_page);
             return 0;
         }
         else

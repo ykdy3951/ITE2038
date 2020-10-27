@@ -15,6 +15,7 @@ int open_table(char *path_name)
         fd = -1;
         return error;
     }
+    header_page = (header_page_t *)malloc(page_size);
     memset(header_page, 0, sizeof(header_page_t));
     int flag = pread(fd, header_page, page_size, 0);
     if (flag != page_size || !header_page->number_of_pages)
