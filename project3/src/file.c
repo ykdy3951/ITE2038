@@ -10,6 +10,21 @@
 
 int open_table(char *path_name)
 {
+    if (table == NULL)
+    {
+        table = (table_t *)malloc(sizeof(table_t));
+        if (table == NULL)
+        {
+            return error;
+        }
+        memset(table->fd_table, -1, sizeof(table->fd_table));
+
+        for (int i = 1; i <= 10; i++)
+        {
+            table->table_path[i] = NULL;
+        }
+    }
+
     if (table->num_of_table >= 10)
     {
         return error;
@@ -29,8 +44,9 @@ int open_table(char *path_name)
         header_page->root_page_number = 0;
         header_page->free_page_number = 0;
         header_page->number_of_pages = 1;
-        header_write(fd);
+        file_write_page(fd, 0, (page_t *)header_page);
     }
+    free(header_page);
     return fd;
 }
 
@@ -38,8 +54,8 @@ int open_table(char *path_name)
 pagenum_t file_alloc_page(int table_id)
 {
     page_t *new_free;
-
-    header_read(table_id);
+    header_page_t *header_page = (header_page_t *)malloc(page_size);
+    file_read_page(table_id, 0, (page_t *)header_page);
 
     pagenum_t free_num = header_page->free_page_number;
     new_free = (page_t *)malloc(page_size);
@@ -55,10 +71,10 @@ pagenum_t file_alloc_page(int table_id)
         free_num = header_page->number_of_pages;
         header_page->number_of_pages++;
     }
-    header_write(table_id);
+    file_write_page(table_id, 0, (page_t *)header_page);
     // header_read();
     free(new_free);
-
+    free(header_page);
     return free_num;
 }
 
@@ -66,15 +82,16 @@ pagenum_t file_alloc_page(int table_id)
 void file_free_page(int table_id, pagenum_t pagenum)
 {
     page_t *page = (page_t *)malloc(page_size);
+    header_page_t *header_page = (header_page_t *)malloc(page_size);
     memset(page, 0, page_size);
-    header_read(table_id);
-    page->header.isLeaf = -1;
+    file_read_page(table_id, 0, (page_t *)header_page);
     page->header.parent_page_number = header_page->free_page_number;
     header_page->free_page_number = pagenum;
 
     file_write_page(table_id, pagenum, page);
-    header_write(table_id);
+    file_write_page(table_id, 0, (page_t *)header_page);
     free(page);
+    free(header_page);
 }
 
 // Read an on-disk page into the in-memory page structure(dest)
@@ -93,26 +110,6 @@ void file_write_page(int table_id, pagenum_t pagenum, const page_t *src)
 {
     int ret;
     ret = pwrite(table->fd_table[table_id], src, page_size, pagenum * page_size);
-    if (ret == error)
-    {
-        perror("pwrite");
-    }
-}
-
-void header_read(int table_id)
-{
-    int ret;
-    ret = pread(table->fd_table[table_id], header_page, page_size, 0);
-    if (ret == error)
-    {
-        perror("pread");
-    }
-}
-
-void header_write(int table_id)
-{
-    int ret;
-    ret = pwrite(table->fd_table[table_id], header_page, page_size, 0);
     if (ret == error)
     {
         perror("pwrite");

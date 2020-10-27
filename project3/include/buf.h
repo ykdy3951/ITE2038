@@ -7,8 +7,8 @@ typedef struct bufferStructure
 {
     union
     {
-        header_page_t header_page;
-        page_t page;
+        header_page_t *header_page;
+        page_t *page;
     };
     int table_id;
     pagenum_t page_num;
@@ -18,12 +18,19 @@ typedef struct bufferStructure
     int next;
 } buf_t;
 
+typedef struct free_buf_t
+{
+    int buf_index;
+    struct free_buf_t *next;
+} free_buf_t;
+
 typedef struct bufferHeader
 {
     int buf_size;
     int used_size;
     int head;
     int tail;
+    free_buf_t *free;
 } buf_header_t;
 
 typedef struct tableStruct
@@ -37,12 +44,12 @@ int init_db(int num_buf);
 int open_table(char *pathname);
 int close_table(int table_id);
 int shutdown_db(void);
-void buf_read_page(int table_id, pagenum_t pagenum, page_t *dest);
-void buf_write_page(int table_id, pagenum_t pagenum, const page_t *src);
-int file_read_buf(int table_id, pagenum_t pagenum);
-int file_write_buf(int table_id, pagenum_t pagenum);
+int buf_read_page(int table_id, pagenum_t pagenum);
+int buf_write_page(int buffer_index);
+int buf_get_page(int buffer_index, int table_id, pagenum_t pagenum);
+int buf_put_page(int index);
 void buf_free_page(int table_id, pagenum_t pagenum);
-pagenum_t buf_alloc_page(int table_id);
+int buf_alloc_page(int table_id);
 
 buf_t *buf;
 buf_header_t *buf_header;

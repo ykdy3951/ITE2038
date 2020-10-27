@@ -62,10 +62,6 @@ typedef struct pageNotHeader
     };
 } page_t;
 
-// int fd;
-
-header_page_t *header_page;
-
 int open_table(char *pathname);
 
 pagenum_t file_alloc_page(int table_id);
