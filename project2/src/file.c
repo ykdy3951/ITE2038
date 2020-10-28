@@ -7,6 +7,8 @@
 #include <sys/stat.h>
 #include "file.h"
 
+fd = -1;
+
 int open_table(char *path_name)
 {
     fd = open(path_name, O_RDWR | O_SYNC | O_CREAT, 0777);

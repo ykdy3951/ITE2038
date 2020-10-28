@@ -70,6 +70,12 @@ int IsEmpty(Queue *q)
 void printAll()
 {
     header_read();
+    // no page
+    if (header_page->root_page_number == 0)
+    {
+        printf("no page\n");
+        return;
+    }
     Queue q;
     InitQueue(&q);
     page_t *page = (page_t *)malloc(page_size);
@@ -113,6 +119,11 @@ void printAll()
 void print_leaf()
 {
     header_read();
+    if (header_page->root_page_number == 0)
+    {
+        printf("no page\n");
+        return;
+    }
     page_t *page = (page_t *)malloc(page_size);
     file_read_page(header_page->root_page_number, page);
     while (!page->header.isLeaf)
@@ -139,6 +150,11 @@ void print_leaf()
 void free_print()
 {
     header_read();
+    if (header_page->free_page_number == 0)
+    {
+        printf("no free page\n");
+        return;
+    }
     page_t *page = (page_t *)malloc(page_size);
     file_read_page(header_page->free_page_number, page);
     printf("%llu ", header_page->free_page_number);
@@ -261,7 +277,7 @@ int db_delete(int64_t key)
 pagenum_t find_leaf(int64_t key)
 {
     header_read();
-    if (header_page->number_of_pages <= 1)
+    if (header_page->number_of_pages <= 1 || header_page->root_page_number == 0)
     {
         return 0;
     }
