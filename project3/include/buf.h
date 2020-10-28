@@ -37,6 +37,7 @@ typedef struct tableStruct
 {
     int fd_table[11];
     char *table_path[11];
+    int num_of_open;
     int num_of_table;
 } table_t;
 

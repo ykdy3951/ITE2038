@@ -76,6 +76,12 @@ void printAll(int table_id)
     pagenum_t root_pagenum = header_page->root_page_number;
     buf_write_page(header_page);
 
+    // page 가 존재하지 않으면 종료한다.
+    if (root_pagenum == 0)
+    {
+        printf("No page\n");
+        return;
+    }
     Queue q;
     InitQueue(&q);
     enqueue(&q, root_pagenum, 0);
@@ -129,6 +135,13 @@ void print_leaf(int table_id)
     pagenum_t root_pagenum = header_page->root_page_number;
     buf_write_page(header_page);
 
+    // page가 존재하지 않으면 종료한다.
+    if (root_pagenum == 0)
+    {
+        printf("No page\n");
+        return;
+    }
+
     page_t *page;
     int page_idx = buf_read_page(table_id, root_pagenum);
     page = buf[page_idx].page;
@@ -166,6 +179,13 @@ void free_print(int table_id)
     header_page = buf[header_idx].header_page;
     pagenum_t free_pagenum = header_page->free_page_number;
     buf_write_page(header_idx);
+
+    // free page가 존재하지 않으면 종료한다.
+    if (free_pagenum == 0)
+    {
+        printf("No free page\n");
+        return;
+    }
 
     page_t *page;
     int page_idx = buf_read_page(table_id, free_pagenum);
@@ -312,7 +332,7 @@ pagenum_t find_leaf(int table_id, int64_t key)
     int header_idx = buf_read_page(table_id, 0);
     header_page = buf[header_idx].header_page;
 
-    if (header_page->number_of_pages <= 1)
+    if (header_page->number_of_pages <= 1 || header_page->root_page_number == 0)
     {
         buf_write_page(header_idx);
         return 0;

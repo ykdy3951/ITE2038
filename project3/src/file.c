@@ -11,6 +11,7 @@
 int open_table(char *path_name)
 {
     // table이 없으면 새로 만든다.
+    int ret = -1;
     if (table == NULL)
     {
         table = (table_t *)malloc(sizeof(table_t));
@@ -19,7 +20,8 @@ int open_table(char *path_name)
             return error;
         }
         memset(table->fd_table, -1, sizeof(table->fd_table));
-
+        table->num_of_open = 0;
+        table->num_of_table = 0;
         for (int i = 1; i <= 10; i++)
         {
             table->table_path[i] = NULL;
@@ -27,21 +29,31 @@ int open_table(char *path_name)
     }
 
     // 기존의 table인 경우
-    for (int i = 1; i <= table->num_of_table; i++)
+    for (int i = 1; i <= table->num_of_open; i++)
     {
         if (!strcmp(table->table_path, path_name))
         {
-            return i;
+            // 한 번 close된 table일 경우
+            if (table->fd_table[i] == -1)
+            {
+                ret = i;
+                break;
+            }
+            // table이 존재하는 경우
+            else
+            {
+                return i;
+            }
         }
     }
 
-    // table이 10개 이상이면 증가 시킨다.
-    if (table->num_of_table >= 10)
+    // 열렸던 table이 10개 이고 reopen의 대상이 아니라면 종료한다.
+    if (table->num_of_open == 10 && ret == -1)
     {
         return error;
     }
 
-    // 그렇지 않을 경우 page를 새로 만든다.
+    // 그렇지 않을 경우 page를 새로 만들거나 다시 등록한다.
     int fd = open(path_name, O_RDWR | O_SYNC | O_CREAT, 0777);
     if (fd < 0)
     {
@@ -49,9 +61,16 @@ int open_table(char *path_name)
         return error;
     }
     // mapping table에 등록하기
-    int ret = ++table->num_of_table;
+    // 새 table 일 경우 pathname 크기 만큼 할당하고 넣어준다.
+    if (ret == -1)
+    {
+        ret = ++table->num_of_open;
+        table->table_path[ret] = (char *)malloc(sizeof(char) * 20);
+        strcpy(table->table_path[ret], path_name);
+    }
+    // 공통 수행 부분
+    table->num_of_table++;
     table->fd_table[ret] = fd;
-    table->table_path[ret] = (char *)malloc(sizeof(char) * strlen(path_name));
 
     header_page_t *header_page = (header_page_t *)malloc(page_size);
     memset(header_page, 0, sizeof(header_page_t));
@@ -65,6 +84,7 @@ int open_table(char *path_name)
         header_page->number_of_pages = 1;
         file_write_page(fd, 0, (page_t *)header_page);
     }
+
     free(header_page);
     return ret;
 }

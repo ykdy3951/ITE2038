@@ -1,4 +1,5 @@
 #include "bpt.h"
+#include "buf.h"
 #include "file.h"
 #include <inttypes.h>
 #include <string.h>
@@ -8,78 +9,94 @@
 int main(int argc, char **argv)
 {
     char command[10];
+    int table_id;
     int64_t key;
     char value[120];
-
+    char pathname[20];
     while (true)
     {
         printf("> ");
         scanf("%s", command);
         if (!strcmp(command, "open"))
         {
-            scanf("%s", value);
-            if (open_table(value) < 0)
+            scanf("%s", pathname);
+            int ret = open_table(pathname);
+            if (ret < 0)
             {
                 printf("OPEN FAIL\n");
             }
             else
             {
-                printf("OPEN SUCCEED\n");
+                printf("OPEN SUCCEED [table id : %d]\n", ret);
             }
         }
         else if (!strcmp(command, "insert"))
         {
-            scanf("%ld %s", &key, value);
-            if (!db_insert(key, value))
+            scanf("%d %ld %s", &table_id, &key, value);
+            if (!db_insert(table_id, key, value))
             {
-                printf("INSERTION SUCCEED [%ld : %s]\n", key, value);
+                printf("INSERTION SUCCEED [%d : %ld : %s]\n", table_id, key, value);
             }
             else
             {
-                printf("INSERTION FAIL [%ld]\n", key);
+                printf("INSERTION FAIL [%d : %ld]\n", table_id, key);
             }
         }
         else if (!strcmp(command, "find"))
         {
-            scanf("%ld", &key);
+            scanf("%d %ld", &table_id, &key);
             char *ret_val = (char *)malloc(val_size);
-            if (!db_find(key, ret_val))
+            if (!db_find(table_id, key, ret_val))
             {
-                printf("THIS KEY EXISTS [%ld : %s]\n", key, ret_val);
+                printf("THIS KEY EXISTS [%d : %ld : %s]\n", table_id, key, ret_val);
             }
             else
             {
-                printf("THIS KEY IS NOT FOUNDED ON DISK [%ld]\n", key);
+                printf("THIS KEY IS NOT FOUNDED ON DISK [%d : %ld]\n", table_id, key);
             }
             free(ret_val);
         }
         else if (!strcmp(command, "delete"))
         {
-            scanf("%ld", &key);
-            if (!db_delete(key))
+            scanf("%d %ld", &table_id, &key);
+            if (!db_delete(table_id, key))
             {
-                printf("DELETION SUCCEED [%ld]\n", key);
+                printf("DELETION SUCCEED [%d : %ld]\n", table_id, key);
             }
             else
             {
-                printf("DELETION FAIL [%ld]\n", key);
+                printf("DELETION FAIL [%d : %ld]\n", table_id, key);
             }
         }
         else if (!strcmp(command, "print"))
         {
-            printAll();
+            scanf("%d", &table_id);
+            printAll(table_id);
         }
         else if (!strcmp(command, "leaf"))
         {
-            print_leaf();
+            scanf("%d", &table_id);
+            print_leaf(table_id);
         }
         else if (!strcmp(command, "free"))
         {
-            free_print();
+            scanf("%d", &table_id);
+            free_print(table_id);
+        }
+        else if (!strcmp(command, "init"))
+        {
+            int buf_size;
+            scanf("%d", &buf_size);
+            init_db(buf_size);
+        }
+        else if (!strcmp(command, "close"))
+        {
+            scanf("%d", &table_id);
+            close_table(table_id);
         }
         else if (!strcmp(command, "quit"))
         {
-            free(header_page);
+            shutdown_db();
             return 0;
         }
         else

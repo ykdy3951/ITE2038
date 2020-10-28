@@ -83,9 +83,9 @@ void InitQueue(Queue *q);
 data dequeue(Queue *q);
 void enqueue(Queue *q, pagenum_t p, int depth);
 int IsEmpty(Queue *q);
-void printAll();
-void print_leaf();
-void free_print();
+void printAll(int table_id);
+void print_leaf(int table_id);
+void free_print(int table_id);
 
 int db_insert(int table_id, int64_t key, char *value);
 int db_find(int table_id, int64_t key, char *ret_val);

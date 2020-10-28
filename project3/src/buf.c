@@ -43,11 +43,22 @@ int init_db(int num_buf)
 
 int close_table(int table_id)
 {
+    // 닫혀있는 table을 또 닫을 경우
+    if (table->fd_table[table_id] == -1)
+    {
+        return 1;
+    }
+
     int buffer_idx = buf_header->tail;
     while (buffer_idx != -1)
     {
         if (buf[buffer_idx].table_id == table_id)
         {
+            if (buf[buffer_idx].is_pinned)
+            {
+                printf("find pinned buffer!\n");
+                return 1;
+            }
             if (buf[buffer_idx].is_dirty)
             {
                 buf_put_page(buffer_idx);
@@ -64,7 +75,7 @@ int close_table(int table_id)
                 }
             }
 
-            //
+            // tail일경우
             if (buffer_idx == buf_header->tail)
             {
                 buf_header->tail = buf[buffer_idx].prev;
@@ -97,6 +108,9 @@ int close_table(int table_id)
         }
         buffer_idx = buf[buffer_idx].prev;
     }
+
+    close(table->fd_table[table_id]);
+    table->fd_table[table_id] = -1;
 
     return 0;
 }
@@ -134,7 +148,22 @@ int shutdown_db(void)
         buf_header->free = temp->next;
         free(temp);
     }
+    // buffer header 할당 해제
     free(buf_header);
+
+    // 모든 table close
+
+    for (int i = 1; i <= table->num_of_open; i++)
+    {
+        free(table->table_path[i]);
+        // 닫혀있는 table이 아닐 경우
+        if (table->fd_table[i] != -1)
+        {
+            close(table->fd_table[i]);
+        }
+    }
+    // table들을 담는 전역 변수 할당 해제
+    free(table);
 
     return 0;
 }
