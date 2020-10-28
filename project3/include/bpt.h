@@ -117,8 +117,8 @@ pagenum_t get_neighbor_pagenum(int table_id, page_t *page, int neighbor_index);
 int64_t get_parent_key(int table_id, page_t *child, int key_index);
 int adjust_root(int table_id, page_t *root, pagenum_t pagenum);
 page_t *remove_entry_from_node(int table_id, page_t *page, pagenum_t pagenum, int64_t key);
-int coalesce_nodes(int table_id, page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t neighbor_pagenum, int neighbor_index, int direction, int64_t k_prime);
-int redistribute_nodes(int table_id, page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t neighbor_pagenum, int neighbor_index, int direction,
+int coalesce_nodes(int table_id, int page_idx, int neighbor_idx, int neighbor_index, int direction, int64_t k_prime);
+int redistribute_nodes(int table_id, int page_idx, int neighbor_idx, int neighbor_index, int direction,
                        int k_prime_index, int64_t k_prime);
 int delete_entry(int table_id, pagenum_t pagenum, int64_t key);
 

@@ -70,17 +70,24 @@ int IsEmpty(Queue *q)
 
 void printAll(int table_id)
 {
-    header_page_t *header_page = (header_page_t *)malloc(page_size);
-    buf_read_page(table_id, 0, header_page);
+    header_page_t *header_page;
+    int header_idx = buf_read_page(table_id, 0);
+    header_page = buf[header_idx].header_page;
+    pagenum_t root_pagenum = header_page->root_page_number;
+    buf_write_page(header_page);
+
     Queue q;
     InitQueue(&q);
-    page_t *page = (page_t *)malloc(page_size);
-    enqueue(&q, header_page->root_page_number, 0);
+    enqueue(&q, root_pagenum, 0);
     int depth = 0;
+    int page_idx;
+
     while (!IsEmpty(&q))
     {
         data d = dequeue(&q);
-        buf_read_page(table_id, d.pagenum, page);
+
+        page_idx = buf_read_page(table_id, d.pagenum);
+        page_t *page = buf[page_idx].page;
 
         if (depth != d.depth)
         {
@@ -107,25 +114,34 @@ void printAll(int table_id)
             printf("(%ld %ld) ", d.pagenum, page->header.parent_page_number);
             printf("| ");
         }
+
+        buf_write_page(page_idx);
     }
     printf("\n");
-    free(page);
-    free(header_page);
 }
 
 void print_leaf(int table_id)
 {
-    header_page_t *header_page = (header_page_t *)malloc(page_size);
-    buf_read_page(table_id, 0, header_page);
-    page_t *page = (page_t *)malloc(page_size);
-    buf_read_page(table_id, header_page->root_page_number, page);
+    // header에서 root pagenum을 가져오고 unpin시킨다.
+    header_page_t *header_page;
+    int header_idx = buf_read_page(table_id, 0);
+    header_page = buf[header_idx].header_page;
+    pagenum_t root_pagenum = header_page->root_page_number;
+    buf_write_page(header_page);
+
+    page_t *page;
+    int page_idx = buf_read_page(table_id, root_pagenum);
+    page = buf[page_idx].page;
     while (!page->header.isLeaf)
     {
-        buf_read_page(table_id, page->one_more_page_number, page);
+        pagenum_t temp_pagenum = page->one_more_page_number;
+        buf_write_page(page_idx);
+        page_idx = buf_read_page(table_id, temp_pagenum);
+        page = buf[page_idx].page;
     }
     while (true)
     {
-
+        pagenum_t temp_pagenum = page->right_sibling_number;
         for (int i = 0; i < page->header.number_of_keys; i++)
         {
             printf("%ld ", page->records[i].key);
@@ -134,28 +150,38 @@ void print_leaf(int table_id)
         {
             break;
         }
-        buf_read_page(table_id, page->right_sibling_number, page);
+        buf_write_page(page_idx);
+        page_idx = buf_read_page(table_id, temp_pagenum);
+        page = buf[page_idx].page;
     }
-    free(page);
-    free(header_page);
+    buf_write_page(page_idx);
     printf("\n");
 }
 
 void free_print(int table_id)
 {
-    header_page_t *header_page = (header_page_t *)malloc(page_size);
-    buf_read_page(table_id, 0, header_page);
-    page_t *page = (page_t *)malloc(page_size);
-    buf_read_page(table_id, header_page->free_page_number, page);
+    // header 처리
+    header_page_t *header_page;
+    int header_idx = buf_read_page(table_id, 0);
+    header_page = buf[header_idx].header_page;
+    pagenum_t free_pagenum = header_page->free_page_number;
+    buf_write_page(header_idx);
+
+    page_t *page;
+    int page_idx = buf_read_page(table_id, free_pagenum);
+    page = buf[page_idx].page;
+
     printf("%llu ", header_page->free_page_number);
     while (page->header.parent_page_number)
     {
+        pagenum_t temp_pagenum = page->header.parent_page_number;
         printf("%llu ", page->header.parent_page_number);
-        buf_read_page(table_id, page->header.parent_page_number, page);
+        buf_write_page(page_idx);
+        page_idx = buf_read_page(table_id, temp_pagenum);
+        page = buf[page_idx].page;
     }
     printf("\n");
-    free(header_page);
-    free(page);
+    buf_write_page(page_idx);
 }
 
 int db_insert(int table_id, int64_t key, char *value)
@@ -283,7 +309,7 @@ int db_delete(int table_id, int64_t key)
 pagenum_t find_leaf(int table_id, int64_t key)
 {
     header_page_t *header_page;
-    int header_idx = buf_read_page(table_id);
+    int header_idx = buf_read_page(table_id, 0);
     header_page = buf[header_idx].header_page;
 
     if (header_page->number_of_pages <= 1)
@@ -750,24 +776,23 @@ int start_new_tree(int table_id, record_t *record)
  */
 Direction_data get_neighbor_index(int table_id, page_t *page, pagenum_t pagenum)
 {
-
     int i;
 
     Direction_data d;
-    page_t *parent = (page_t *)malloc(page_size);
-    buf_read_page(table_id, page->header.parent_page_number, parent);
+    int parent_idx = buf_read_page(table_id, page->header.parent_page_number);
+    page_t *parent = buf[parent_idx].page;
 
     for (i = 0; i < parent->header.number_of_keys; i++)
     {
         if (parent->entries[i].page_number == pagenum)
         {
-            free(parent);
+            buf_put_page(parent_idx);
             d.data = i - 1;
             d.direction = 1;
             return d;
         }
     }
-    free(parent);
+    buf_put_page(parent_idx);
     d.data = 0;
     d.direction = -1;
     return d;
@@ -775,10 +800,11 @@ Direction_data get_neighbor_index(int table_id, page_t *page, pagenum_t pagenum)
 
 pagenum_t get_neighbor_pagenum(int table_id, page_t *page, int neighbor_index)
 {
-    page_t *parent = (page_t *)malloc(page_size);
+    page_t *parent;
     pagenum_t pagenum = page->header.parent_page_number;
 
-    buf_read_page(table_id, pagenum, parent);
+    int parent_idx = buf_read_page(table_id, pagenum);
+    parent = buf[parent_idx].page;
 
     //printf("%d %d\n", parent->entries[0].key, parent->entries[0].page_number);
 
@@ -792,16 +818,17 @@ pagenum_t get_neighbor_pagenum(int table_id, page_t *page, int neighbor_index)
         ret_pagenum = parent->entries[neighbor_index].page_number;
     }
 
-    free(parent);
+    buf_write_page(parent_idx);
     return ret_pagenum;
 }
 
 int64_t get_parent_key(int table_id, page_t *child, int key_index)
 {
-    page_t *parent = (page_t *)malloc(page_size);
-    buf_read_page(table_id, child->header.parent_page_number, parent);
+    page_t *parent;
+    int parent_idx = buf_read_page(table_id, child->header.parent_page_number);
+    parent = buf[parent_idx].page;
     int64_t ret_key = parent->entries[key_index].key;
-    free(parent);
+    buf_write_page(parent_idx);
     return ret_key;
 }
 
@@ -851,7 +878,6 @@ int adjust_root(int table_id, page_t *root, pagenum_t pagenum)
 
     if (root->header.number_of_keys > 0)
     {
-        buf_write_page(table_id, pagenum, root);
         return 0;
     }
     /* Case: empty root. 
@@ -860,27 +886,30 @@ int adjust_root(int table_id, page_t *root, pagenum_t pagenum)
     // If it has a child, promote
     // the first (only) child
     // as the new root.
-    header_page_t *header_page = (header_page_t *)malloc(page_size);
-    buf_read_page(table_id, 0, header_page);
-    page_t *new_root = make_node();
+    header_page_t *header_page;
+    int header_idx = buf_read_page(table_id, 0);
 
     header_page->root_page_number = 0;
+
     if (!root->header.isLeaf)
     {
+        // root page 재설정
         pagenum_t new_root_pagenum = root->one_more_page_number;
 
-        buf_read_page(table_id, new_root_pagenum, new_root);
-        new_root->header.parent_page_number = 0;
-        buf_write_page(table_id, new_root_pagenum, new_root);
+        int new_root_idx = buf_read_page(table_id, new_root_pagenum);
+        buf[new_root_idx].page->header.parent_page_number = 0;
+
+        // dirty 설정
+        buf[new_root_idx].is_dirty = 1;
+        buf_write_page(new_root_idx);
+
         header_page->root_page_number = new_root_pagenum;
     }
 
     // If it is a leaf (has no children),
     // then the whole tree is empty.
-    buf_write_page(table_id, 0, header_page);
+    buf_write_page(header_idx);
     buf_free_page(table_id, pagenum);
-    free(new_root);
-    free(header_page);
     return 0;
 }
 
@@ -890,9 +919,14 @@ int adjust_root(int table_id, page_t *root, pagenum_t pagenum)
  * can accept the additional entries
  * without exceeding the maximum.
  */
-int coalesce_nodes(int table_id, page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t neighbor_pagenum, int neighbor_index, int direction, int64_t k_prime)
+int coalesce_nodes(int table_id, int page_idx, int neighbor_idx, int neighbor_index, int direction, int64_t k_prime)
 {
     int i, j, neighbor_insertion_index, n_end;
+    int temp_idx;
+    page_t *page = buf[page_idx].page;
+    page_t *neighbor = buf[neighbor_idx].page;
+    pagenum_t pagenum = buf[page_idx].page_num;
+    pagenum_t neighbor_pagenum = buf[neighbor_idx].page_num;
     pagenum_t parent_pagenum = page->header.parent_page_number;
 
     /* Swap neighbor with node if node is on the
@@ -906,7 +940,6 @@ int coalesce_nodes(int table_id, page_t *page, pagenum_t pagenum, page_t *neighb
 
     if (!page->header.isLeaf)
     {
-        page_t *child = (page_t *)malloc(page_size);
         if (direction == -1)
         {
             n_end = page->header.number_of_keys;
@@ -922,18 +955,26 @@ int coalesce_nodes(int table_id, page_t *page, pagenum_t pagenum, page_t *neighb
             page->entries[n_end].page_number = neighbor->one_more_page_number;
             page->header.number_of_keys++;
 
-            buf_read_page(table_id, page->one_more_page_number, child);
-            child->header.parent_page_number = pagenum;
-            buf_write_page(table_id, page->one_more_page_number, child);
+            // child 재설정
+            temp_idx = buf_read_page(table_id, page->one_more_page_number);
+            buf[temp_idx].page->header.parent_page_number = pagenum;
+            buf[temp_idx].is_dirty = 1;
+            buf_write_page(temp_idx);
+
             for (int i = 0; i < page->header.number_of_keys; i++)
             {
-                buf_read_page(table_id, page->entries[i].page_number, child);
-                child->header.parent_page_number = pagenum;
-                buf_write_page(table_id, page->entries[i].page_number, child);
+                temp_idx = buf_read_page(table_id, page->entries[i].page_number);
+                buf[temp_idx].page->header.parent_page_number = pagenum;
+                buf[temp_idx].is_dirty = 1;
+                buf_write_page(temp_idx);
             }
 
+            // page들 dirty 설정
+            buf[page_idx].is_dirty = 1;
+            buf[neighbor_idx].is_dirty = 1;
+
             buf_free_page(table_id, neighbor_pagenum);
-            buf_write_page(table_id, pagenum, page);
+            buf_write_page(page_idx);
         }
         else
         {
@@ -950,20 +991,27 @@ int coalesce_nodes(int table_id, page_t *page, pagenum_t pagenum, page_t *neighb
             neighbor->entries[neighbor_insertion_index].page_number = page->one_more_page_number;
             neighbor->header.number_of_keys++;
 
-            buf_read_page(table_id, neighbor->one_more_page_number, child);
-            child->header.parent_page_number = neighbor_pagenum;
-            buf_write_page(table_id, neighbor->one_more_page_number, child);
+            // child 재설정
+            temp_idx = buf_read_page(table_id, neighbor->one_more_page_number);
+            buf[temp_idx].page->header.parent_page_number = neighbor_pagenum;
+            buf[temp_idx].is_dirty = 1;
+            buf_write_page(temp_idx);
+
             for (int i = 0; i < neighbor->header.number_of_keys; i++)
             {
-                buf_read_page(table_id, neighbor->entries[i].page_number, child);
-                child->header.parent_page_number = neighbor_pagenum;
-                buf_write_page(table_id, neighbor->entries[i].page_number, child);
+                temp_idx = buf_read_page(table_id, neighbor->entries[i].page_number);
+                buf[temp_idx].page->header.parent_page_number = neighbor_pagenum;
+                buf[temp_idx].is_dirty = 1;
+                buf_write_page(temp_idx);
             }
 
+            // page들 dirty 설정
+            buf[page_idx].is_dirty = 1;
+            buf[neighbor_idx].is_dirty = 1;
+
             buf_free_page(table_id, pagenum);
-            buf_write_page(table_id, neighbor_pagenum, neighbor);
+            buf_write_page(neighbor_idx);
         }
-        free(child);
     }
 
     else
@@ -978,8 +1026,13 @@ int coalesce_nodes(int table_id, page_t *page, pagenum_t pagenum, page_t *neighb
                 page->header.number_of_keys++;
             }
             page->right_sibling_number = neighbor->right_sibling_number;
+
+            // page들 dirty 설정
+            buf[page_idx].is_dirty = 1;
+            buf[neighbor_idx].is_dirty = 1;
+
             buf_free_page(table_id, neighbor_pagenum);
-            buf_write_page(table_id, pagenum, page);
+            buf_write_page(page_idx);
         }
         else
         {
@@ -991,12 +1044,15 @@ int coalesce_nodes(int table_id, page_t *page, pagenum_t pagenum, page_t *neighb
                 neighbor->header.number_of_keys++;
             }
             neighbor->right_sibling_number = page->right_sibling_number;
+
+            // page들 dirty 설정
+            buf[page_idx].is_dirty = 1;
+            buf[neighbor_idx].is_dirty = 1;
+
             buf_free_page(table_id, pagenum);
-            buf_write_page(table_id, neighbor_pagenum, neighbor);
+            buf_write_page(neighbor_idx);
         }
     }
-    free(page);
-    free(neighbor);
     int ret = delete_entry(table_id, parent_pagenum, k_prime);
     return ret;
 }
@@ -1007,13 +1063,17 @@ int coalesce_nodes(int table_id, page_t *page, pagenum_t pagenum, page_t *neighb
  * small node's entries without exceeding the
  * maximum
  */
-int redistribute_nodes(int table_id, page_t *page, pagenum_t pagenum, page_t *neighbor, pagenum_t neighbor_pagenum, int neighbor_index, int direction, int k_prime_index, int64_t k_prime)
+int redistribute_nodes(int table_id, int page_idx, int neighbor_idx, int neighbor_index, int direction, int k_prime_index, int64_t k_prime)
 {
+    // temp_idx는 child의 부모를 바꿔 주기 위해서 필요한 local variable이다.
+    int i, temp_idx, parent_idx;
+    page_t *page = buf[page_idx].page;
+    page_t *neighbor = buf[neighbor_idx].page;
+    pagenum_t pagenum = buf[page_idx].page_num;
+    pagenum_t neighbor_pagenum = buf[neighbor_idx].page_num;
+    parent_idx = buf_read_page(table_id, page->header.parent_page_number);
+    page_t *parent = buf[parent_idx].page;
 
-    int i;
-    page_t *parent = (page_t *)malloc(page_size);
-    page_t *temp_page = (page_t *)malloc(page_size);
-    buf_read_page(table_id, page->header.parent_page_number, parent);
     /* Case: n has a neighbor to the left. 
      * Pull the neighbor's last key-pointer pair over
      * from the neighbor's right end to n's left end.
@@ -1034,9 +1094,11 @@ int redistribute_nodes(int table_id, page_t *page, pagenum_t pagenum, page_t *ne
             page->one_more_page_number = neighbor->entries[neighbor->header.number_of_keys - 1].page_number;
             parent->entries[k_prime_index].key = neighbor->entries[neighbor->header.number_of_keys - 1].key;
 
-            buf_read_page(table_id, page->one_more_page_number, temp_page);
-            temp_page->header.parent_page_number = pagenum;
-            buf_write_page(table_id, page->one_more_page_number, temp_page);
+            // 자식들의 부모를 재설정 해준 뒤 dirty 설정을 해준다.
+            temp_idx = buf_read_page(table_id, page->one_more_page_number);
+            buf[temp_idx].page->header.parent_page_number = pagenum;
+            buf[temp_idx].is_dirty = 1;
+            buf_write_page(temp_idx);
 
             neighbor->entries[neighbor->header.number_of_keys - 1].page_number = 0;
             neighbor->entries[neighbor->header.number_of_keys - 1].key = 0;
@@ -1071,9 +1133,10 @@ int redistribute_nodes(int table_id, page_t *page, pagenum_t pagenum, page_t *ne
             page->entries[page->header.number_of_keys].key = k_prime;
             page->entries[page->header.number_of_keys].page_number = neighbor->one_more_page_number;
 
-            buf_read_page(table_id, page->entries[page->header.number_of_keys].page_number, temp_page);
-            temp_page->header.parent_page_number = pagenum;
-            buf_write_page(table_id, page->entries[page->header.number_of_keys].page_number, temp_page);
+            temp_idx = buf_read_page(table_id, page->entries[page->header.number_of_keys].page_number);
+            buf[temp_idx].page->header.parent_page_number = pagenum;
+            buf[temp_idx].is_dirty = 1;
+            buf_write_page(temp_idx);
 
             parent->entries[k_prime_index].key = neighbor->entries[0].key;
             neighbor->one_more_page_number = neighbor->entries[0].page_number;
@@ -1102,12 +1165,16 @@ int redistribute_nodes(int table_id, page_t *page, pagenum_t pagenum, page_t *ne
      */
     page->header.number_of_keys++;
     neighbor->header.number_of_keys--;
-    buf_write_page(table_id, pagenum, page);
-    buf_write_page(table_id, neighbor_pagenum, neighbor);
-    buf_write_page(table_id, page->header.parent_page_number, parent);
-    free(parent);
-    free(page);
-    free(neighbor);
+
+    // dirty 설정
+    buf[page_idx].is_dirty = 1;
+    buf[neighbor_idx].is_dirty = 1;
+    buf[parent_idx].is_dirty = 1;
+
+    // unpin
+    buf_write_page(page_idx);
+    buf_write_page(neighbor_idx);
+    buf_write_page(parent_idx);
     return 0;
 }
 
@@ -1119,17 +1186,17 @@ int redistribute_nodes(int table_id, page_t *page, pagenum_t pagenum, page_t *ne
 int delete_entry(int table_id, pagenum_t pagenum, int64_t key)
 {
     // Remove key and pointer from node.
-    page_t *page = (page_t *)malloc(page_size);
     int ret;
-    buf_read_page(table_id, pagenum, page);
+    page_t *page;
+    int page_idx = buf_read_page(table_id, pagenum);
+    page = buf[page_idx].page;
 
-    header_page_t *header_page = (header_page_t *)malloc(page_size);
-    buf_read_page(table_id, 0, header_page);
-
-    pagenum_t root_pagenum = header_page->root_page_number;
-    free(header_page);
+    int header_idx = buf_read_page(table_id, 0);
+    pagenum_t root_pagenum = buf[header_idx].header_page->free_page_number;
+    buf_write_page(header_idx);
 
     page = remove_entry_from_node(table_id, page, pagenum, key);
+    buf[page_idx].is_dirty = 1;
 
     /* Case:  deletion from the root. 
      */
@@ -1137,7 +1204,7 @@ int delete_entry(int table_id, pagenum_t pagenum, int64_t key)
     if (root_pagenum == pagenum)
     {
         ret = adjust_root(table_id, page, pagenum);
-        free(page);
+        buf_write_page(page_idx);
         return ret;
     }
 
@@ -1151,8 +1218,7 @@ int delete_entry(int table_id, pagenum_t pagenum, int64_t key)
 
     if (page->header.number_of_keys > 0)
     {
-        buf_write_page(table_id, pagenum, page);
-        free(page);
+        buf_write_page(page_idx);
         return 0;
     }
 
@@ -1176,18 +1242,15 @@ int delete_entry(int table_id, pagenum_t pagenum, int64_t key)
     // printf("[k_prime] %ld\n", k_prime);
     pagenum_t neighbor_pagenum = get_neighbor_pagenum(table_id, page, neighbor_index);
     // printf("[neighbor pagenum] %lu\n", neighbor_pagenum);
-    page_t *neighbor = (page_t *)malloc(page_size);
-
-    buf_read_page(table_id, neighbor_pagenum, neighbor);
-
+    int neighbor_idx = buf_read_page(table_id, neighbor_pagenum);
     int size = page->header.isLeaf ? leaf_order : branch_order - 1;
 
     /* Coalescence. */
-    if (neighbor->header.number_of_keys < size)
-        return coalesce_nodes(table_id, page, pagenum, neighbor, neighbor_pagenum, neighbor_index, direction, k_prime);
+    if (buf[neighbor_idx].page->header.number_of_keys < size)
+        return coalesce_nodes(table_id, page_idx, neighbor_idx, neighbor_index, direction, k_prime);
 
     /* Redistribution. */
 
     else
-        return redistribute_nodes(table_id, page, pagenum, neighbor, neighbor_pagenum, neighbor_index, direction, k_prime_index, k_prime);
+        return redistribute_nodes(table_id, page_idx, neighbor_idx, neighbor_index, direction, k_prime_index, k_prime);
 }
