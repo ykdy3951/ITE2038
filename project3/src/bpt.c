@@ -70,16 +70,29 @@ int IsEmpty(Queue *q)
 
 void printAll(int table_id)
 {
+    // 닫혀있거나 열리지 않은 테이블이면 종료
+    if (table->fd_table[table_id] == -1)
+    {
+        printf("[ERROR] YOU HAVE TO OPEN THE EXISTING DATA FILE.\n");
+        return fail;
+    }
+
+    // buffer가 없는 경우 종료
+    if (buf == NULL)
+    {
+        printf("[ERROR] NO BUFFER.\n");
+        return fail;
+    }
     header_page_t *header_page;
     int header_idx = buf_read_page(table_id, 0);
     header_page = buf[header_idx].header_page;
     pagenum_t root_pagenum = header_page->root_page_number;
-    buf_write_page(header_page);
+    buf_write_page(header_idx);
 
     // page 가 존재하지 않으면 종료한다.
     if (root_pagenum == 0)
     {
-        printf("No page\n");
+        printf("[ERROR] NO PAGE\n");
         return;
     }
     Queue q;
@@ -128,17 +141,30 @@ void printAll(int table_id)
 
 void print_leaf(int table_id)
 {
+    // 닫혀있거나 열리지 않은 테이블이면 종료
+    if (table->fd_table[table_id] == -1)
+    {
+        printf("[ERROR] YOU HAVE TO OPEN THE EXISTING DATA FILE.\n");
+        return fail;
+    }
+
+    // buffer가 없는 경우 종료
+    if (buf == NULL)
+    {
+        printf("[ERROR] NO BUFFER.\n");
+        return fail;
+    }
     // header에서 root pagenum을 가져오고 unpin시킨다.
     header_page_t *header_page;
     int header_idx = buf_read_page(table_id, 0);
     header_page = buf[header_idx].header_page;
     pagenum_t root_pagenum = header_page->root_page_number;
-    buf_write_page(header_page);
+    buf_write_page(header_idx);
 
     // page가 존재하지 않으면 종료한다.
     if (root_pagenum == 0)
     {
-        printf("No page\n");
+        printf("[ERROR] NO PAGE\n");
         return;
     }
 
@@ -173,6 +199,19 @@ void print_leaf(int table_id)
 
 void free_print(int table_id)
 {
+    // 닫혀있거나 열리지 않은 테이블이면 종료
+    if (table->fd_table[table_id] == -1)
+    {
+        printf("[ERROR] YOU HAVE TO OPEN THE EXISTING DATA FILE.\n");
+        return fail;
+    }
+
+    // buffer가 없는 경우 종료
+    if (buf == NULL)
+    {
+        printf("[ERROR] NO BUFFER.\n");
+        return fail;
+    }
     // header 처리
     header_page_t *header_page;
     int header_idx = buf_read_page(table_id, 0);
@@ -183,7 +222,7 @@ void free_print(int table_id)
     // free page가 존재하지 않으면 종료한다.
     if (free_pagenum == 0)
     {
-        printf("No free page\n");
+        printf("[ERROR] NO FREE PAGE\n");
         return;
     }
 
@@ -206,10 +245,17 @@ void free_print(int table_id)
 
 int db_insert(int table_id, int64_t key, char *value)
 {
+    // 닫혀있거나 열리지 않은 테이블이면 종료
+    if (table->fd_table[table_id] == -1)
+    {
+        printf("[ERROR] YOU HAVE TO OPEN THE EXISTING DATA FILE.\n");
+        return fail;
+    }
+
     // buffer가 없는 경우 종료
     if (buf == NULL)
     {
-        printf("[ERROR] YOU HAVE TO OPEN THE EXISTING DATA FILE.\n");
+        printf("[ERROR] NO BUFFER.\n");
         return fail;
     }
 
@@ -230,6 +276,8 @@ int db_insert(int table_id, int64_t key, char *value)
 
     pagenum_t root_pagenum = header_page->root_page_number;
     buf_write_page(header_idx);
+
+    printf("HEADER PAGE READ COMPLETE\n");
 
     if (root_pagenum == 0)
     {
@@ -261,9 +309,17 @@ int db_insert(int table_id, int64_t key, char *value)
 
 int db_find(int table_id, int64_t key, char *ret_val)
 {
-    if (buf == NULL)
+    // 닫혀있거나 열리지 않은 테이블이면 종료
+    if (table->fd_table[table_id] == -1)
     {
         printf("[ERROR] YOU HAVE TO OPEN THE EXISTING DATA FILE.\n");
+        return fail;
+    }
+
+    // buffer가 없는 경우 종료
+    if (buf == NULL)
+    {
+        printf("[ERROR] NO BUFFER.\n");
         return fail;
     }
 
@@ -298,9 +354,17 @@ int db_find(int table_id, int64_t key, char *ret_val)
 
 int db_delete(int table_id, int64_t key)
 {
-    if (buf == NULL)
+    // 닫혀있거나 열리지 않은 테이블이면 종료
+    if (table->fd_table[table_id] == -1)
     {
         printf("[ERROR] YOU HAVE TO OPEN THE EXISTING DATA FILE.\n");
+        return fail;
+    }
+
+    // buffer가 없는 경우 종료
+    if (buf == NULL)
+    {
+        printf("[ERROR] NO BUFFER.\n");
         return fail;
     }
 
@@ -765,8 +829,12 @@ int start_new_tree(int table_id, record_t *record)
     int header_idx = buf_read_page(table_id, 0);
     header_page = buf[header_idx].header_page;
 
+    printf("HEADER PAGE READ COMPLETE\n");
+
     page_t *root = make_leaf();
     int root_idx = buf_alloc_page(table_id);
+
+    printf("NEW PAGE ALLOC COMPLETE\n");
 
     root->records[0].key = record->key;
     strcpy(root->records[0].value, record->value);

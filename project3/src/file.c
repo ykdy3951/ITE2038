@@ -31,7 +31,7 @@ int open_table(char *path_name)
     // 기존의 table인 경우
     for (int i = 1; i <= table->num_of_open; i++)
     {
-        if (!strcmp(table->table_path, path_name))
+        if (!strcmp(table->table_path[i], path_name))
         {
             // 한 번 close된 table일 경우
             if (table->fd_table[i] == -1)
@@ -82,7 +82,7 @@ int open_table(char *path_name)
         header_page->root_page_number = 0;
         header_page->free_page_number = 0;
         header_page->number_of_pages = 1;
-        file_write_page(fd, 0, (page_t *)header_page);
+        file_write_page(ret, 0, (page_t *)header_page);
     }
 
     free(header_page);

@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <stdio.h>
 // Initialize buffer pool with given number and buffer manager.
 int init_db(int num_buf)
 {
@@ -117,40 +118,42 @@ int close_table(int table_id)
 
 int shutdown_db(void)
 {
-    // buffer 할당 해제
-    int buffer_idx = buf_header->tail;
-    while (buffer_idx != -1)
+    if (buf != NULL)
     {
-        if (buf[buffer_idx].is_dirty)
+        // buffer 할당 해제
+        int buffer_idx = buf_header->tail;
+        while (buffer_idx != -1)
         {
-            buf_put_page(buffer_idx);
-        }
-        else
-        {
-            if (buf[buffer_idx].page_num)
+            if (buf[buffer_idx].is_dirty)
             {
-                free(buf[buffer_idx].page);
+                buf_put_page(buffer_idx);
             }
             else
             {
-                free(buf[buffer_idx].header_page);
+                if (buf[buffer_idx].page_num)
+                {
+                    free(buf[buffer_idx].page);
+                }
+                else
+                {
+                    free(buf[buffer_idx].header_page);
+                }
             }
+            buffer_idx = buf[buffer_idx].prev;
         }
-        buffer_idx = buf[buffer_idx].prev;
-    }
-    free(buf);
+        free(buf);
 
-    // buffer free index 관리하는 linked list 할당 해제
-    while (buf_header->free != NULL)
-    {
-        free_buf_t *temp;
-        temp = buf_header->free;
-        buf_header->free = temp->next;
-        free(temp);
+        // buffer free index 관리하는 linked list 할당 해제
+        while (buf_header->free != NULL)
+        {
+            free_buf_t *temp;
+            temp = buf_header->free;
+            buf_header->free = temp->next;
+            free(temp);
+        }
+        // buffer header 할당 해제
+        free(buf_header);
     }
-    // buffer header 할당 해제
-    free(buf_header);
-
     // 모든 table close
 
     for (int i = 1; i <= table->num_of_open; i++)
@@ -243,14 +246,14 @@ int buf_put_page(int index)
 {
     if (buf[index].page_num == 0)
     {
-        file_write_page(buf[index].table_id, buf[index].page_num, (page_t *)&buf[index].header_page);
+        file_write_page(buf[index].table_id, buf[index].page_num, (page_t *)buf[index].header_page);
         free(buf[index].header_page);
         buf_init(index);
         buf[index].header_page = NULL;
     }
     else
     {
-        file_write_page(buf[index].table_id, buf[index].page_num, &buf[index].page);
+        file_write_page(buf[index].table_id, buf[index].page_num, buf[index].page);
         free(buf[index].header_page);
         buf_init(index);
         buf[index].page = NULL;
@@ -426,7 +429,7 @@ int buf_alloc_page(int table_id)
             buf[free_idx].page_num = free_num;
             buf[free_idx].table_id = table_id;
             buf[free_idx].page = (page_t *)malloc(page_size);
-            memcpy(buf[free_idx].page, 0, page_size);
+            memset(buf[free_idx].page, 0, page_size);
             // buf_get_page(free_idx, table_id, pagenum);
             LRU_func(free_idx);
         }
@@ -444,7 +447,7 @@ int buf_alloc_page(int table_id)
             buf[free_idx].page_num = free_num;
             buf[free_idx].table_id = table_id;
             buf[free_idx].page = (page_t *)malloc(page_size);
-            memcpy(buf[free_idx].page, 0, page_size);
+            memset(buf[free_idx].page, 0, page_size);
             // buf_get_page(free_idx, table_id, pagenum);
 
             buf[free_idx].prev = -1;
