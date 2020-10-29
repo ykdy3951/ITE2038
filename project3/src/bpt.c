@@ -74,14 +74,14 @@ void printAll(int table_id)
     if (table->fd_table[table_id] == -1)
     {
         printf("[ERROR] YOU HAVE TO OPEN THE EXISTING DATA FILE.\n");
-        return fail;
+        return;
     }
 
     // buffer가 없는 경우 종료
     if (buf == NULL)
     {
         printf("[ERROR] NO BUFFER.\n");
-        return fail;
+        return;
     }
     header_page_t *header_page;
     int header_idx = buf_read_page(table_id, 0);
@@ -145,14 +145,14 @@ void print_leaf(int table_id)
     if (table->fd_table[table_id] == -1)
     {
         printf("[ERROR] YOU HAVE TO OPEN THE EXISTING DATA FILE.\n");
-        return fail;
+        return;
     }
 
     // buffer가 없는 경우 종료
     if (buf == NULL)
     {
         printf("[ERROR] NO BUFFER.\n");
-        return fail;
+        return;
     }
     // header에서 root pagenum을 가져오고 unpin시킨다.
     header_page_t *header_page;
@@ -203,14 +203,14 @@ void free_print(int table_id)
     if (table->fd_table[table_id] == -1)
     {
         printf("[ERROR] YOU HAVE TO OPEN THE EXISTING DATA FILE.\n");
-        return fail;
+        return;
     }
 
     // buffer가 없는 경우 종료
     if (buf == NULL)
     {
         printf("[ERROR] NO BUFFER.\n");
-        return fail;
+        return;
     }
     // header 처리
     header_page_t *header_page;
@@ -230,11 +230,11 @@ void free_print(int table_id)
     int page_idx = buf_read_page(table_id, free_pagenum);
     page = buf[page_idx].page;
 
-    printf("%llu ", header_page->free_page_number);
+    printf("%lu ", header_page->free_page_number);
     while (page->header.parent_page_number)
     {
         pagenum_t temp_pagenum = page->header.parent_page_number;
-        printf("%llu ", page->header.parent_page_number);
+        printf("%lu ", page->header.parent_page_number);
         buf_write_page(page_idx);
         page_idx = buf_read_page(table_id, temp_pagenum);
         page = buf[page_idx].page;

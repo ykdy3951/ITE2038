@@ -49,67 +49,68 @@ int close_table(int table_id)
     {
         return 1;
     }
-
-    int buffer_idx = buf_header->tail;
-    while (buffer_idx != -1)
+    if (buf != NULL)
     {
-        if (buf[buffer_idx].table_id == table_id)
+        int buffer_idx = buf_header->tail;
+        while (buffer_idx != -1)
         {
-            if (buf[buffer_idx].is_pinned)
+            if (buf[buffer_idx].table_id == table_id)
             {
-                printf("find pinned buffer!\n");
-                return 1;
-            }
-            if (buf[buffer_idx].is_dirty)
-            {
-                buf_put_page(buffer_idx);
-            }
-            else
-            {
-                if (buf[buffer_idx].page_num)
+                if (buf[buffer_idx].is_pinned)
                 {
-                    free(buf[buffer_idx].page);
+                    printf("find pinned buffer!\n");
+                    return 1;
+                }
+                if (buf[buffer_idx].is_dirty)
+                {
+                    buf_put_page(buffer_idx);
                 }
                 else
                 {
-                    free(buf[buffer_idx].header_page);
+                    if (buf[buffer_idx].page_num)
+                    {
+                        free(buf[buffer_idx].page);
+                    }
+                    else
+                    {
+                        free(buf[buffer_idx].header_page);
+                    }
                 }
-            }
 
-            // tail일경우
-            if (buffer_idx == buf_header->tail)
-            {
-                buf_header->tail = buf[buffer_idx].prev;
-                buf[buf[buffer_idx].prev].next = -1;
-            }
-            else
-            {
-                int prev = buf[buffer_idx].prev;
-                int next = buf[buffer_idx].next;
-
-                // prev is head
-                if (prev == -1)
+                // tail일경우
+                if (buffer_idx == buf_header->tail)
                 {
-                    buf[next].prev = prev;
-                    buf_header->head = next;
+                    buf_header->tail = buf[buffer_idx].prev;
+                    buf[buf[buffer_idx].prev].next = -1;
                 }
                 else
                 {
-                    buf[prev].next = next;
-                    buf[next].prev = prev;
-                }
-            }
+                    int prev = buf[buffer_idx].prev;
+                    int next = buf[buffer_idx].next;
 
-            // free buffer index를 추가 시킨다.
-            free_buf_t *temp = (free_buf_t *)malloc(sizeof(free_buf_t));
-            temp->next = buf_header->free;
-            temp->buf_index = buffer_idx;
-            buf_header->free = temp;
-            buf_header->used_size--;
+                    // prev is head
+                    if (prev == -1)
+                    {
+                        buf[next].prev = prev;
+                        buf_header->head = next;
+                    }
+                    else
+                    {
+                        buf[prev].next = next;
+                        buf[next].prev = prev;
+                    }
+                }
+
+                // free buffer index를 추가 시킨다.
+                free_buf_t *temp = (free_buf_t *)malloc(sizeof(free_buf_t));
+                temp->next = buf_header->free;
+                temp->buf_index = buffer_idx;
+                buf_header->free = temp;
+                buf_header->used_size--;
+            }
+            buffer_idx = buf[buffer_idx].prev;
         }
-        buffer_idx = buf[buffer_idx].prev;
     }
-
     close(table->fd_table[table_id]);
     table->fd_table[table_id] = -1;
 
@@ -155,19 +156,20 @@ int shutdown_db(void)
         free(buf_header);
     }
     // 모든 table close
-
-    for (int i = 1; i <= table->num_of_open; i++)
+    if (table != NULL)
     {
-        free(table->table_path[i]);
-        // 닫혀있는 table이 아닐 경우
-        if (table->fd_table[i] != -1)
+        for (int i = 1; i <= table->num_of_open; i++)
         {
-            close(table->fd_table[i]);
+            free(table->table_path[i]);
+            // 닫혀있는 table이 아닐 경우
+            if (table->fd_table[i] != -1)
+            {
+                close(table->fd_table[i]);
+            }
         }
+        // table들을 담는 전역 변수 할당 해제
+        free(table);
     }
-    // table들을 담는 전역 변수 할당 해제
-    free(table);
-
     return 0;
 }
 

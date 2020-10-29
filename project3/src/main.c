@@ -87,12 +87,26 @@ int main(int argc, char **argv)
         {
             int buf_size;
             scanf("%d", &buf_size);
-            init_db(buf_size);
+            if (!init_db(buf_size))
+            {
+                printf("INIT SUCCEED [SIZE : %d]\n", buf_size);
+            }
+            else
+            {
+                printf("INIT FAIL\n");
+            }
         }
         else if (!strcmp(command, "close"))
         {
             scanf("%d", &table_id);
-            close_table(table_id);
+            if (!close_table(table_id))
+            {
+                printf("CLOSE TABLE SUCCEED [TABLE ID : %d]\n", table_id);
+            }
+            else
+            {
+                printf("CLOSE TABLE FAIL [TABLE ID : %d]\n", table_id);
+            }
         }
         else if (!strcmp(command, "quit"))
         {
