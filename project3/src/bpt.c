@@ -277,7 +277,7 @@ int db_insert(int table_id, int64_t key, char *value)
     pagenum_t root_pagenum = header_page->root_page_number;
     buf_write_page(header_idx);
 
-    printf("HEADER PAGE READ COMPLETE\n");
+    // printf("HEADER PAGE READ COMPLETE\n");
 
     if (root_pagenum == 0)
     {
@@ -829,12 +829,12 @@ int start_new_tree(int table_id, record_t *record)
     int header_idx = buf_read_page(table_id, 0);
     header_page = buf[header_idx].header_page;
 
-    printf("HEADER PAGE READ COMPLETE\n");
+    // printf("HEADER PAGE READ COMPLETE\n");
 
     page_t *root = make_leaf();
     int root_idx = buf_alloc_page(table_id);
 
-    printf("NEW PAGE ALLOC COMPLETE\n");
+    // printf("NEW PAGE ALLOC COMPLETE\n");
 
     root->records[0].key = record->key;
     strcpy(root->records[0].value, record->value);
