@@ -109,6 +109,10 @@ pagenum_t file_alloc_page(int table_id)
     {
         free_num = header_page->number_of_pages;
         header_page->number_of_pages++;
+
+        page_t *page = (page_t *)malloc(page_size);
+        file_write_page(table_id, free_num, page);
+        free(page);
     }
     file_write_page(table_id, 0, (page_t *)header_page);
     // header_read();

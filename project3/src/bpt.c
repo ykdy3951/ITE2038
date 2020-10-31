@@ -28,6 +28,21 @@ int branch_order = BRANCH_ORDER;
  * printing each entire rank on a separate
  * line, finishing with the leaves.
  */
+void usage(void)
+{
+    printf("Enter any of the following commands after the prompt > :\n"
+           "\topen <pname>  -- pname에 해당하는 file을 열거나 생성\n"
+           "\tinit <size>  -- buffer를 size만큼의 크기로 생성\n"
+           "\tinsert <tid> <k> <v> -- tid에 해당하는 tree에 key와 value를 넣는다.\n"
+           "\tdelete <tid> <k>  -- tid에 해당하는 tree에서 k 값을 지운다.\n"
+           "\tprint <tid> -- tid에 해당하는 B+tree 출력\n"
+           "\tleaf <tid> -- tid에 해당하는 tree의 leaf출력\n"
+           "\tfree <tid> -- tid에 해당하는 tree의 free page들 출력 "
+           "\tclose <tid> -- tid에 해당하는 table을 닫는다."
+           "\tquit -- Quit.\n"
+           "\thelp -- Print this help message.\n");
+}
+
 void InitQueue(Queue *q)
 {
     q->front = NULL;
@@ -375,7 +390,6 @@ int db_delete(int table_id, int64_t key)
     int ret = db_find(table_id, key, tmp_val);
     pagenum_t key_pagenum = find_leaf(table_id, key);
     free(tmp_val);
-
     if (!ret && key_pagenum)
     {
         int ret = delete_entry(table_id, key_pagenum, key);
@@ -976,7 +990,7 @@ int adjust_root(int table_id, page_t *root, pagenum_t pagenum)
     // as the new root.
     header_page_t *header_page;
     int header_idx = buf_read_page(table_id, 0);
-
+    header_page = buf[header_idx].header_page;
     header_page->root_page_number = 0;
 
     if (!root->header.isLeaf)
@@ -1280,12 +1294,11 @@ int delete_entry(int table_id, pagenum_t pagenum, int64_t key)
     page = buf[page_idx].page;
 
     int header_idx = buf_read_page(table_id, 0);
-    pagenum_t root_pagenum = buf[header_idx].header_page->free_page_number;
+    pagenum_t root_pagenum = buf[header_idx].header_page->root_page_number;
     buf_write_page(header_idx);
 
     page = remove_entry_from_node(table_id, page, pagenum, key);
     buf[page_idx].is_dirty = 1;
-
     /* Case:  deletion from the root. 
      */
 

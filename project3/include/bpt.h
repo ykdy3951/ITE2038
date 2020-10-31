@@ -77,7 +77,7 @@ typedef struct Direction_data
  * to data is always num_keys.  The
  * last leaf pointer points to the next leaf.
  */
-
+void usage(void);
 // FUNCTION PROTOTYPES.
 void InitQueue(Queue *q);
 data dequeue(Queue *q);

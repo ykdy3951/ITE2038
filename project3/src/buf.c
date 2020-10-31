@@ -364,13 +364,18 @@ void buf_free_page(int table_id, pagenum_t pagenum)
     int header_idx = buf_read_page(table_id, 0);
     int target_idx = buf_read_page(table_id, pagenum);
 
-    memset(buf[target_idx].page, 0, page_size);
+    if (buf[header_idx].is_dirty == 1)
+    {
+        file_write_page(table_id, 0, (page_t *)buf[header_idx].header_page);
+    }
 
-    buf[target_idx].page->header.parent_page_number = buf[header_idx].header_page->free_page_number;
-    buf[target_idx].is_dirty = 1;
+    file_free_page(table_id, pagenum);
 
-    buf[header_idx].header_page->free_page_number = pagenum;
-    buf[header_idx].is_dirty = 1;
+    file_read_page(table_id, 0, (page_t *)buf[header_idx].header_page);
+    file_read_page(table_id, pagenum, buf[target_idx].page);
+
+    buf[target_idx].is_dirty = 0;
+    buf[header_idx].is_dirty = 0;
 
     // 함수가 끝나기 전에 pin을 뽑는다.
     buf_write_page(header_idx);
@@ -381,102 +386,21 @@ void buf_free_page(int table_id, pagenum_t pagenum)
 int buf_alloc_page(int table_id)
 {
     int header_idx = buf_read_page(table_id, 0);
-    int free_idx;
-    pagenum_t free_num = buf[header_idx].header_page->free_page_number;
 
-    // free page가 있을 경우
-    if (free_num)
+    if (buf[header_idx].is_dirty)
     {
-        free_idx = buf_read_page(table_id, free_num);
-        buf[header_idx].header_page->free_page_number = buf[free_idx].page->header.parent_page_number;
-
-        buf[free_idx].table_id = table_id;
-        buf[free_idx].page_num = free_num;
+        file_write_page(table_id, 0, (page_t *)buf[header_idx].header_page);
     }
 
-    // 없는 경우
-    else
-    {
-        free_num = buf[header_idx].header_page->number_of_pages;
-        buf[header_idx].header_page->number_of_pages++;
+    pagenum_t free_num = file_alloc_page(table_id);
 
-        if (buf_header->used_size == buf_header->buf_size)
-        {
-            free_idx = buf_header->tail;
-            while (true)
-            {
-                // 모든 buffer에 pin이 있을 경우 종료한다.
-                if (free_idx == -1)
-                {
-                    exit(EXIT_FAILURE);
-                }
-                // 사용 중인 경우 prev로 이동한다.
-                if (buf[free_idx].is_pinned)
-                {
-                    free_idx = buf[free_idx].prev;
-                }
-                // 찾은 경우 반복을 종료한다.
-                else
-                {
-                    break;
-                }
-            }
-            // 위치의 page가 dirty page 일 경우 page를 file에 write한다.
-            if (buf[free_idx].is_dirty)
-            {
-                buf_put_page(free_idx);
-            }
+    int free_idx = buf_read_page(table_id, free_num);
 
-            buf_init(free_idx);
-            buf[free_idx].page_num = free_num;
-            buf[free_idx].table_id = table_id;
-            buf[free_idx].page = (page_t *)malloc(page_size);
-            memset(buf[free_idx].page, 0, page_size);
-            // buf_get_page(free_idx, table_id, pagenum);
-            LRU_func(free_idx);
-        }
+    file_read_page(table_id, 0, (page_t *)buf[header_idx].header_page);
 
-        // buffer에 공간이 남아있을 경우
-        // free_idx linked list에서 맨 앞을 빼온다.
-        else
-        {
-            free_buf_t *temp = buf_header->free;
-            free_idx = temp->buf_index;
-            buf_header->free = temp->next;
-            free(temp);
+    buf[header_idx].is_dirty = 0;
+    buf[free_idx].is_dirty = 0;
 
-            buf_init(free_idx);
-            buf[free_idx].page_num = free_num;
-            buf[free_idx].table_id = table_id;
-            buf[free_idx].page = (page_t *)malloc(page_size);
-            memset(buf[free_idx].page, 0, page_size);
-            // buf_get_page(free_idx, table_id, pagenum);
-
-            buf[free_idx].prev = -1;
-            buf[free_idx].next = -1;
-
-            // 처음 buffer에 쓰는 경우는 head와 tail을 현재 buffer index로 만들어준다.
-            if (buf_header->used_size == 0)
-            {
-                buf_header->head = free_idx;
-                buf_header->tail = free_idx;
-            }
-            // 처음은 아닌 경우, head만 바꿔주고 doubly linked list 형태로 맞게 수정한다.
-            else
-            {
-                buf[buf_header->head].prev = free_idx;
-                buf[free_idx].next = buf_header->head;
-                buf_header->head = free_idx;
-            }
-
-            // 사용중인 버퍼의 크기를 늘린다.
-            buf_header->used_size++;
-        }
-        buf[free_idx].is_pinned++;
-    }
-
-    buf[header_idx].is_dirty = 1;
-    buf[free_idx].is_dirty = 1;
     buf_write_page(header_idx);
     buf_write_page(free_idx);
 

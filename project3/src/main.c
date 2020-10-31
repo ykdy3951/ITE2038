@@ -13,6 +13,7 @@ int main(int argc, char **argv)
     int64_t key;
     char value[120];
     char pathname[20];
+    usage();
     while (true)
     {
         printf("> ");
@@ -111,6 +112,11 @@ int main(int argc, char **argv)
         else if (!strcmp(command, "quit"))
         {
             shutdown_db();
+            return 0;
+        }
+        else if (!strcmp(command, "help"))
+        {
+            usage();
             return 0;
         }
         else
