@@ -114,7 +114,7 @@ int close_table(int table_id)
     }
     close(table->fd_table[table_id]);
     table->fd_table[table_id] = -1;
-
+    table->num_of_table--;
     return 0;
 }
 
