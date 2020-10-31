@@ -111,6 +111,7 @@ pagenum_t file_alloc_page(int table_id)
         header_page->number_of_pages++;
 
         page_t *page = (page_t *)malloc(page_size);
+        memset(page, 0, page_size);
         file_write_page(table_id, free_num, page);
         free(page);
     }

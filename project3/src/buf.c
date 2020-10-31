@@ -231,6 +231,7 @@ int buf_get_page(int buffer_index, int table_id, pagenum_t pagenum)
     if (pagenum == 0)
     {
         buf[buffer_index].header_page = (header_page_t *)malloc(page_size);
+        memset(buf[buffer_index].header_page, 0, page_size);
         buf_init(buffer_index);
         file_read_page(table_id, pagenum, (page_t *)buf[buffer_index].header_page);
         buf[buffer_index].table_id = table_id;
@@ -239,6 +240,7 @@ int buf_get_page(int buffer_index, int table_id, pagenum_t pagenum)
     else
     {
         buf[buffer_index].page = (page_t *)malloc(page_size);
+        memset(buf[buffer_index].page, 0, page_size);
         buf_init(buffer_index);
         file_read_page(table_id, pagenum, (page_t *)buf[buffer_index].page);
         buf[buffer_index].table_id = table_id;
@@ -414,6 +416,7 @@ int buf_alloc_page(int table_id)
 
     buf[header_idx].is_dirty = 0;
     buf[free_idx].is_dirty = 0;
+    buf[free_idx].page_num = free_num;
 
     buf_write_page(header_idx);
     buf_write_page(free_idx);

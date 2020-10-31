@@ -613,7 +613,8 @@ int insert_into_leaf_after_splitting(int table_id, int leaf_idx, record_t *new_r
 
     int new_leaf_idx = buf_alloc_page(table_id);
     memcpy(buf[new_leaf_idx].page, new_leaf, page_size);
-    leaf->right_sibling_number = buf[new_leaf_idx].page_num;
+
+    buf[leaf_idx].page->right_sibling_number = buf[new_leaf_idx].page_num;
 
     new_key = new_leaf->records[0].key;
 
