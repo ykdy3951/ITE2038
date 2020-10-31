@@ -188,12 +188,15 @@ int LRU_func(int buffer_index)
     int next = buf[buffer_index].next;
     int prev = buf[buffer_index].prev;
 
+    // printf("%d - %d - %d\n", buf[buffer_index].prev, buffer_index, buf[buffer_index].next);
+
     if (buf_header->tail != buffer_index)
     {
         buf[next].prev = prev;
         buf[prev].next = next;
         buf[buffer_index].next = recent;
         buf[buffer_index].prev = -1;
+        buf[recent].prev = buffer_index;
         buf_header->head = buffer_index;
     }
 
@@ -202,17 +205,18 @@ int LRU_func(int buffer_index)
         buf[prev].next = next;
         buf[buffer_index].next = recent;
         buf[buffer_index].prev = -1;
+        buf[recent].prev = buffer_index;
         buf_header->head = buffer_index;
         buf_header->tail = prev;
     }
+
+    // printf("%d - %d - %d\n", buf[buffer_index].prev, buffer_index, buf[buffer_index].next);
 
     return 0;
 }
 
 int buf_init(int buffer_index)
 {
-    // buf[buffer_index].prev = -1;
-    // buf[buffer_index].next = -1;
     buf[buffer_index].table_id = 0;
     buf[buffer_index].page_num = 0;
     buf[buffer_index].is_dirty = 0;
@@ -277,7 +281,7 @@ int buf_write_page(int buffer_index)
 // pagenum, table_id에 해당하는 page를 읽어들이라고 요청해주는 함수.
 int buf_read_page(int table_id, pagenum_t pagenum)
 {
-    int buffer_index = buf_header->head;
+    int buffer_index = buf_header->tail;
 
     // buffer에 찾는 page가 존재하는 경우
     while (buffer_index != -1)
@@ -288,7 +292,7 @@ int buf_read_page(int table_id, pagenum_t pagenum)
             buf[buffer_index].is_pinned++;
             return buffer_index;
         }
-        buffer_index = buf[buffer_index].next;
+        buffer_index = buf[buffer_index].prev;
     }
 
     // 없는 경우 buffer를 file에서 불러온다.
@@ -319,6 +323,12 @@ int buf_read_page(int table_id, pagenum_t pagenum)
         {
             buf_put_page(buffer_index);
         }
+        else
+        {
+            free(buf[buffer_index].header_page);
+            buf_init(buffer_index);
+            buf[buffer_index].page = NULL;
+        }
         buf_get_page(buffer_index, table_id, pagenum);
         LRU_func(buffer_index);
     }
@@ -331,6 +341,8 @@ int buf_read_page(int table_id, pagenum_t pagenum)
         buffer_index = temp->buf_index;
         buf_header->free = temp->next;
         free(temp);
+
+        int head = buf_header->head;
 
         buf_get_page(buffer_index, table_id, pagenum);
 
@@ -346,11 +358,12 @@ int buf_read_page(int table_id, pagenum_t pagenum)
         // 처음은 아닌 경우, head만 바꿔주고 doubly linked list 형태로 맞게 수정한다.
         else
         {
-            buf[buf_header->head].prev = buffer_index;
-            buf[buffer_index].next = buf_header->head;
+            buf[head].prev = buffer_index;
+            buf[buffer_index].next = head;
             buf_header->head = buffer_index;
         }
 
+        //printf("%d - %d - %d\n", buf[buffer_index].prev, buffer_index, buf[buffer_index].next);
         // 사용중인 버퍼의 크기를 늘린다.
         buf_header->used_size++;
     }

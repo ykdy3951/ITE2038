@@ -126,36 +126,3 @@ int main(int argc, char **argv)
     }
     return 0;
 }
-
-// int main(void)
-// {
-
-//     header_page = (header_page_t *)malloc(page_size);
-//     char value[120] = "aa";
-//     open_table("aag.db");
-//     for (int64_t i = 1; i <= 10000; i++)
-//     {
-//         db_insert(i, value);
-//         printf("insert %ld\n", i);
-//     }
-//     // print_leaf();
-//     // printAll();
-//     for (int64_t i = 11; i <= 10000; i++)
-//     {
-//         if (db_find(10000, value))
-//         {
-//             printf("%d\n\n\n", i);
-//             break;
-//         }
-//         if (db_delete(i))
-//         {
-//             printf("1\n");
-//         }
-//         printf("delete %ld\n", i);
-//     }
-//     printAll();
-//     print_leaf();
-//     free_print();
-//     free(header_page);
-//     return 0;
-// }
