@@ -343,7 +343,6 @@ int db_find(int table_id, int64_t key, char *ret_val)
     pagenum_t pagenum = find_leaf(table_id, key);
     if (pagenum == 0)
     {
-        free(page);
         return fail;
     }
 
