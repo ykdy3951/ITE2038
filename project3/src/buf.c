@@ -1,4 +1,5 @@
 #include "buf.h"
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -300,7 +301,7 @@ int buf_read_page(int table_id, pagenum_t pagenum)
             // 모든 buffer에 pin이 있을 경우 종료한다.
             if (buffer_index == -1)
             {
-                exit(EXIT_FAILURE);
+                exit(1);
             }
             // 사용 중인 경우 prev로 이동한다.
             if (buf[buffer_index].is_pinned)
