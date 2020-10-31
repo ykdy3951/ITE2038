@@ -140,3 +140,16 @@ int main(int argc, char **argv)
     }
     return 0;
 }
+
+// int main(void)
+// {
+//     open_table("1.db");
+//     init_db(4);
+//     for (int64_t i = 1; i <= 10000; i++)
+//     {
+//         db_insert(1, i, "aa");
+//         printf("%ld\n", i);
+//     }
+//     shutdown_db();
+//     return 0;
+// }

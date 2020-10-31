@@ -1007,7 +1007,7 @@ int adjust_root(int table_id, page_t *root, pagenum_t pagenum)
 
         header_page->root_page_number = new_root_pagenum;
     }
-
+    buf[header_idx].is_dirty = 1;
     // If it is a leaf (has no children),
     // then the whole tree is empty.
     buf_write_page(header_idx);
@@ -1077,6 +1077,7 @@ int coalesce_nodes(int table_id, int page_idx, int neighbor_idx, int neighbor_in
 
             buf_free_page(table_id, neighbor_pagenum);
             buf_write_page(page_idx);
+            buf_write_page(neighbor_idx);
         }
         else
         {
@@ -1113,6 +1114,7 @@ int coalesce_nodes(int table_id, int page_idx, int neighbor_idx, int neighbor_in
 
             buf_free_page(table_id, pagenum);
             buf_write_page(neighbor_idx);
+            buf_write_page(page_idx);
         }
     }
 
@@ -1135,6 +1137,7 @@ int coalesce_nodes(int table_id, int page_idx, int neighbor_idx, int neighbor_in
 
             buf_free_page(table_id, neighbor_pagenum);
             buf_write_page(page_idx);
+            buf_write_page(neighbor_idx);
         }
         else
         {
@@ -1153,6 +1156,7 @@ int coalesce_nodes(int table_id, int page_idx, int neighbor_idx, int neighbor_in
 
             buf_free_page(table_id, pagenum);
             buf_write_page(neighbor_idx);
+            buf_write_page(page_idx);
         }
     }
     int ret = delete_entry(table_id, parent_pagenum, k_prime);
