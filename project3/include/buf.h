@@ -42,7 +42,7 @@ typedef struct tableStruct
 } table_t;
 
 int init_db(int num_buf);
-int open_table(char *pathname);
+//int open_table(char *pathname);
 int close_table(int table_id);
 int shutdown_db(void);
 int buf_read_page(int table_id, pagenum_t pagenum);
