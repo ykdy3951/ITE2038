@@ -37,8 +37,8 @@ void usage(void)
            "\tdelete <tid> <k>  -- tid에 해당하는 tree에서 k 값을 지운다.\n"
            "\tprint <tid> -- tid에 해당하는 B+tree 출력\n"
            "\tleaf <tid> -- tid에 해당하는 tree의 leaf출력\n"
-           "\tfree <tid> -- tid에 해당하는 tree의 free page들 출력 "
-           "\tclose <tid> -- tid에 해당하는 table을 닫는다."
+           "\tfree <tid> -- tid에 해당하는 tree의 free page들 출력\n"
+           "\tclose <tid> -- tid에 해당하는 table을 닫는다.\n"
            "\tquit -- Quit.\n"
            "\thelp -- Print this help message.\n");
 }
