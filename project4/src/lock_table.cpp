@@ -3,13 +3,11 @@
 
 unordered_map<pair<int, int64_t>, table_entry_t, HashFunction> lock_table;
 pthread_mutex_t lock_table_latch;
-pthread_cond_t cond;
 
 int init_lock_table()
 {
 	/* DO IMPLEMENT YOUR ART !!!!! */
 	lock_table_latch = PTHREAD_MUTEX_INITIALIZER;
-	cond = PTHREAD_COND_INITIALIZER;
 	return 0;
 }
 
@@ -57,7 +55,7 @@ lock_t *lock_acquire(int table_id, int64_t key)
 			temp->tail = new_lock;
 			while (temp->head != new_lock)
 			{
-				pthread_cond_wait(&cond, &lock_table_latch);
+				pthread_cond_wait(&new_lock->cond, &lock_table_latch);
 			}
 			// new_lock->state = ACQUIRED;
 			pthread_mutex_unlock(&lock_table_latch);
@@ -70,14 +68,13 @@ lock_t *lock_acquire(int table_id, int64_t key)
 
 int lock_release(lock_t *lock_obj)
 {
-	// cout << "RELEASE\n";
 	/* GOOD LUCK !!! */
 	pthread_mutex_lock(&lock_table_latch);
 	if (lock_obj->prev != NULL)
 	{
 		while (lock_obj->state != ACQUIRED)
 		{
-			pthread_cond_wait(&cond, &lock_table_latch);
+			pthread_cond_wait(&lock_obj->cond, &lock_table_latch);
 		}
 		table_entry_t *temp = lock_obj->sentinel;
 		temp->head = lock_obj->next;
@@ -87,7 +84,7 @@ int lock_release(lock_t *lock_obj)
 		{
 			temp->head->state = ACQUIRED;
 			temp->head->prev = NULL;
-			pthread_cond_signal(&cond);
+			pthread_cond_signal(&temp->head->cond);
 		}
 		else
 		{
@@ -105,7 +102,7 @@ int lock_release(lock_t *lock_obj)
 		{
 			temp->head->state = ACQUIRED;
 			temp->head->prev = NULL;
-			pthread_cond_signal(&cond);
+			pthread_cond_signal(&temp->head->cond);
 		}
 		else
 		{

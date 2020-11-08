@@ -41,11 +41,13 @@ public:
     lock_t *next;
     table_entry_t *sentinel;
     lock_state state;
+    pthread_cond_t cond;
     lock_t()
     {
         prev = NULL;
         next = NULL;
         sentinel = NULL;
+        cond = PTHREAD_COND_INITIALIZER;
     }
 };
 
