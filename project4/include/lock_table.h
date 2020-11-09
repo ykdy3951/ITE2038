@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <pthread.h>
-#include <list>
+#include <stdio.h>
 #include <unordered_map>
 
 using namespace std;
@@ -14,42 +14,8 @@ enum lock_state
     ACQUIRED
 };
 
-class table_entry_t;
-class lock_t;
-
-class table_entry_t
-{
-    /* NO PAIN, NO GAIN. */
-public:
-    int table_id;
-    int64_t key;
-    lock_t *tail;
-    lock_t *head;
-    table_entry_t(int table_id, int64_t key)
-    {
-        table_id = table_id;
-        key = key;
-        head = NULL;
-        tail = NULL;
-    }
-};
-
-class lock_t
-{
-public:
-    lock_t *prev;
-    lock_t *next;
-    table_entry_t *sentinel;
-    lock_state state;
-    pthread_cond_t cond;
-    lock_t()
-    {
-        prev = NULL;
-        next = NULL;
-        sentinel = NULL;
-        cond = PTHREAD_COND_INITIALIZER;
-    }
-};
+typedef struct table_entry_t table_entry_t;
+typedef struct lock_t lock_t;
 
 class HashFunction
 {

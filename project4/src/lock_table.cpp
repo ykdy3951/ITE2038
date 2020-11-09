@@ -1,5 +1,24 @@
 #include <lock_table.h>
+#include <stdlib.h>
 #include <iostream>
+
+struct table_entry_t
+{
+	/* NO PAIN, NO GAIN. */
+	int table_id;
+	int64_t key;
+	lock_t *tail;
+	lock_t *head;
+};
+
+struct lock_t
+{
+	lock_t *prev;
+	lock_t *next;
+	table_entry_t *sentinel;
+	lock_state state;
+	pthread_cond_t cond;
+};
 
 unordered_map<pair<int, int64_t>, table_entry_t, HashFunction> lock_table;
 pthread_mutex_t lock_table_latch;
@@ -9,6 +28,20 @@ int init_lock_table()
 	/* DO IMPLEMENT YOUR ART !!!!! */
 	lock_table_latch = PTHREAD_MUTEX_INITIALIZER;
 	return 0;
+}
+
+void init_entry(table_entry_t *entry, int table_id, int64_t key)
+{
+	entry->table_id = table_id;
+	entry->key = key;
+}
+
+void init_lock(lock_t *lock)
+{
+	lock->prev = NULL;
+	lock->next = NULL;
+	lock->sentinel = NULL;
+	lock->cond = PTHREAD_COND_INITIALIZER;
 }
 
 lock_t *lock_acquire(int table_id, int64_t key)
@@ -21,8 +54,10 @@ lock_t *lock_acquire(int table_id, int64_t key)
 
 	if (location == lock_table.end())
 	{
-		table_entry_t new_entry(table_id, key);
-		lock_t *new_lock = new lock_t();
+		table_entry_t new_entry;
+		init_entry(&new_entry, table_id, key);
+		lock_t *new_lock = (lock_t *)malloc(sizeof(lock_t));
+		init_lock(new_lock);
 		new_lock->state = ACQUIRED;
 		new_entry.head = new_entry.tail = new_lock;
 		lock_table.insert({{table_id, key}, new_entry});
@@ -34,7 +69,8 @@ lock_t *lock_acquire(int table_id, int64_t key)
 	{
 		if ((*location).second.head == NULL)
 		{
-			lock_t *new_lock = new lock_t();
+			lock_t *new_lock = (lock_t *)malloc(sizeof(lock_t));
+			init_lock(new_lock);
 			new_lock->state = ACQUIRED;
 			new_lock->sentinel = &(*location).second;
 			(*location).second.head = (*location).second.tail = new_lock;
@@ -44,7 +80,8 @@ lock_t *lock_acquire(int table_id, int64_t key)
 		else
 		{
 			table_entry_t *temp = &(*location).second;
-			lock_t *new_lock = new lock_t();
+			lock_t *new_lock = (lock_t *)malloc(sizeof(lock_t));
+			init_lock(new_lock);
 			new_lock->state = WAITING;
 			new_lock->sentinel = temp;
 
@@ -79,7 +116,7 @@ int lock_release(lock_t *lock_obj)
 		table_entry_t *temp = lock_obj->sentinel;
 		temp->head = lock_obj->next;
 
-		delete lock_obj;
+		free(lock_obj);
 		if (temp->head != NULL)
 		{
 			temp->head->state = ACQUIRED;
@@ -97,7 +134,7 @@ int lock_release(lock_t *lock_obj)
 		table_entry_t *temp = lock_obj->sentinel;
 		temp->head = lock_obj->next;
 
-		delete lock_obj;
+		free(lock_obj);
 		if (temp->head != NULL)
 		{
 			temp->head->state = ACQUIRED;
