@@ -23,9 +23,8 @@ public:
     size_t operator()(const pair<int, int64_t> &p) const
     {
         int table_id = p.first;
-        int64_t key = p.second % 1000000007;
-        long long res = table_id + key * 10;
-        res %= 1000000007;
+        int64_t key = p.second;
+        long long res = table_id + key * 100;
         return res;
     }
 };
