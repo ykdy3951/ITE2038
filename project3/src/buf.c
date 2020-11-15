@@ -78,6 +78,10 @@ int close_table(int table_id)
                     }
                 }
 
+                if (buffer_idx == buf_header->head && buffer_idx == buf_header->tail)
+                {
+                    buf_header->head = buf_header->tail = -1;
+                }
                 // tail일경우
                 if (buffer_idx == buf_header->tail)
                 {
