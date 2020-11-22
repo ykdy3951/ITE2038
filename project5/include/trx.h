@@ -2,8 +2,11 @@
 #define __TRX_H__
 
 #include "lock_mgr.h"
+#include "bpt.h"
 #include <unordered_map> // hash map
 #include <pthread.h>
+
+#define ABORTED -1
 
 using namespace std;
 
@@ -15,11 +18,13 @@ public:
     int trx_id;
     lock_t *trx_head;
     lock_t *trx_tail;
+    bool is_aborted;
     trx_t(int trx_id)
     {
         trx_id;
         trx_head = NULL;
         trx_tail = NULL;
+        is_aborted = false;
     }
 };
 

@@ -28,7 +28,7 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 		new_lock->state = ACQUIRED;
 		/////////
 		new_lock->lock_mode = lock_mode;
-		new_lock->trx_ptr = &trx_table[trx_id];
+		new_lock->owner_trx_id = trx_id;
 		if (trx_table[table_id].trx_head == NULL)
 		{
 			trx_table[trx_id].trx_head = trx_table[trx_id].trx_tail = new_lock;
@@ -57,7 +57,7 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 
 			/////////
 			new_lock->lock_mode = lock_mode;
-			new_lock->trx_ptr = &trx_table[trx_id];
+			new_lock->owner_trx_id = trx_id;
 			if (trx_table[table_id].trx_head == NULL)
 			{
 				trx_table[trx_id].trx_head = trx_table[trx_id].trx_tail = new_lock;
@@ -89,7 +89,7 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 
 			/////////
 			new_lock->lock_mode = lock_mode;
-			new_lock->trx_ptr = &trx_table[trx_id];
+			new_lock->owner_trx_id = trx_id;
 			if (trx_table[table_id].trx_head == NULL)
 			{
 				trx_table[trx_id].trx_head = trx_table[trx_id].trx_tail = new_lock;
@@ -140,20 +140,53 @@ int lock_release(lock_t *lock_obj)
 		{
 			pthread_cond_wait(&lock_obj->cond, &lock_table_latch);
 		}
-		table_entry_t *temp = lock_obj->sentinel;
-		temp->head = lock_obj->next;
 
-		delete lock_obj;
-		if (temp->head != NULL)
+		// prev lock of lock object exists and is also ACQUIRED
+		if (lock_obj->prev != NULL)
 		{
-			temp->head->state = ACQUIRED;
-			temp->head->prev = NULL;
-			pthread_cond_signal(&temp->head->cond);
+			table_entry_t *temp = lock_obj->sentinel;
+			lock_t *prev = lock_obj->prev;
+			prev->next = lock_obj->next;
+
+			delete lock_obj;
 		}
+
+		// lock object is head
 		else
 		{
-			temp->tail = NULL;
-			//lock_table.erase({temp->table_id, temp->key});
+			table_entry_t *temp = lock_obj->sentinel;
+			temp->head = lock_obj->next;
+
+			delete lock_obj;
+			if (temp->head != NULL)
+			{
+				temp->head->prev = NULL;
+				if (temp->head->state != ACQUIRED)
+				{
+					// If lock mode of Head is EXCLUSIVE, then unlocking this lock
+					if (temp->head->lock_mode == EXCLUSIVE)
+					{
+						temp->head->state = ACQUIRED;
+						pthread_cond_signal(&temp->head->cond);
+					}
+					// If lock mode of head is shared, then unlock sequential shared lock
+					else
+					{
+						lock_t *lock = temp->head;
+						while (lock != NULL && lock->lock_mode == SHARED)
+						{
+							lock->state = ACQUIRED;
+							pthread_cond_signal(&lock->cond);
+						}
+					}
+				}
+			}
+			// lock list is empty
+			else
+			{
+				temp->tail = NULL;
+				//lock_table.erase({temp->table_id, temp->key});
+			}
 		}
 	}
 	else
@@ -162,11 +195,29 @@ int lock_release(lock_t *lock_obj)
 		temp->head = lock_obj->next;
 
 		delete lock_obj;
+
 		if (temp->head != NULL)
 		{
-			temp->head->state = ACQUIRED;
 			temp->head->prev = NULL;
-			pthread_cond_signal(&temp->head->cond);
+			if (temp->head->state != ACQUIRED)
+			{
+				// If lock mode of Head is EXCLUSIVE, then unlocking this lock
+				if (temp->head->lock_mode == EXCLUSIVE)
+				{
+					temp->head->state = ACQUIRED;
+					pthread_cond_signal(&temp->head->cond);
+				}
+				// If lock mode of head is shared, then unlock sequential shared lock
+				else
+				{
+					lock_t *lock = temp->head;
+					while (lock != NULL && lock->lock_mode == SHARED)
+					{
+						lock->state = ACQUIRED;
+						pthread_cond_signal(&lock->cond);
+					}
+				}
+			}
 		}
 		else
 		{
@@ -176,8 +227,4 @@ int lock_release(lock_t *lock_obj)
 	}
 	pthread_mutex_unlock(&lock_table_latch);
 	return 0;
-}
-
-void trx_abort(int trx_id)
-{
 }

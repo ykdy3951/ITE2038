@@ -797,14 +797,14 @@ int insert_into_parent(int table_id, int left_idx, int64_t key, int right_idx)
  */
 int insert_into_new_root(int table_id, int left_idx, int64_t key, int right_idx)
 {
-    header_page_t *header_page;
-    int header_idx = buf_read_page(table_id, 0);
-    header_page = buf[header_idx].header_page;
 
     page_t *root = make_node();
     int root_idx = buf_alloc_page(table_id);
     pagenum_t root_pagenum = buf[root_idx].page_num;
 
+    header_page_t *header_page;
+    int header_idx = buf_read_page(table_id, 0);
+    header_page = buf[header_idx].header_page;
     // root 처리
     root->one_more_page_number = buf[left_idx].page_num;
     root->entries[0].key = key;
@@ -839,17 +839,17 @@ int insert_into_new_root(int table_id, int left_idx, int64_t key, int right_idx)
  */
 int start_new_tree(int table_id, record_t *record)
 {
-    header_page_t *header_page;
-    int header_idx = buf_read_page(table_id, 0);
-    header_page = buf[header_idx].header_page;
-
-    // printf("HEADER PAGE READ COMPLETE\n");
 
     page_t *root = make_leaf();
     int root_idx = buf_alloc_page(table_id);
 
     // printf("NEW PAGE ALLOC COMPLETE\n");
 
+    header_page_t *header_page;
+    int header_idx = buf_read_page(table_id, 0);
+    header_page = buf[header_idx].header_page;
+
+    // printf("HEADER PAGE READ COMPLETE\n");
     root->records[0].key = record->key;
     strcpy(root->records[0].value, record->value);
 

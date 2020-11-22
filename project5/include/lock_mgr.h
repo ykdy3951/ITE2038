@@ -15,7 +15,8 @@ using namespace std;
 enum lock_state
 {
     WAITING,
-    ACQUIRED
+    ACQUIRED,
+    ABORT
 };
 
 class table_entry_t;
@@ -48,7 +49,7 @@ public:
     pthread_cond_t cond;
     int lock_mode; // 0 is SHARED option, 1 is EXCLUSIVE option.
     lock_t *trx_next_lock;
-    trx_t *trx_ptr;
+    int owner_trx_id;
     lock_t()
     {
         prev = NULL;
