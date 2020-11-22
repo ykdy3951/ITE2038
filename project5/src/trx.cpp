@@ -175,6 +175,7 @@ int db_update(int table_id, int64_t key, char *values, int trx_id)
     int buffer_idx = buf_read_page(table_id, pagenum);
     page_t *page = buf[buffer_idx].page;
     buf_write_page(buffer_idx);
+
     lock_t *lock = lock_acquire(table_id, key, trx_id, EXCLUSIVE);
     if (lock == nullptr)
     {
