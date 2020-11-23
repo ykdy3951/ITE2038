@@ -5,7 +5,6 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <unordered_map>
-#include "trx.h"
 
 #define SHARED 0
 #define EXCLUSIVE 1

@@ -24,15 +24,15 @@
  * to change the type and content
  * of the value field.
  */
-typedef struct data
+typedef struct data_t
 {
     pagenum_t pagenum;
     int depth;
-} data;
+} data_t;
 
 typedef struct Node
 {
-    data d;
+    data_t d;
     struct Node *next;
 } Node;
 
@@ -80,7 +80,7 @@ typedef struct Direction_data
 void usage(void);
 // FUNCTION PROTOTYPES.
 void InitQueue(Queue *q);
-data dequeue(Queue *q);
+data_t dequeue(Queue *q);
 void enqueue(Queue *q, pagenum_t p, int depth);
 int IsEmpty(Queue *q);
 void printAll(int table_id);

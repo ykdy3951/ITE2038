@@ -1,4 +1,5 @@
 #include "lock_mgr.h"
+#include "trx.h"
 #include <stdlib.h>
 #include <iostream>
 
@@ -19,6 +20,12 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 	/* ENJOY CODING !!!! */
 	pthread_mutex_lock(&lock_table_latch);
 
+	if (trx_table.find(trx_id) == trx_table.end())
+	{
+		pthread_mutex_unlock(&lock_table_latch);
+		return nullptr;
+	}
+
 	auto location = lock_table.find({table_id, key});
 
 	if (location == lock_table.end())
@@ -29,6 +36,7 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 		/////////
 		new_lock->lock_mode = lock_mode;
 		new_lock->owner_trx_id = trx_id;
+		pthread_mutex_lock(&trx_mgr_latch);
 		if (trx_table[table_id].trx_head == NULL)
 		{
 			trx_table[trx_id].trx_head = trx_table[trx_id].trx_tail = new_lock;
@@ -39,6 +47,7 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 			tail->trx_next_lock = new_lock;
 			trx_table[trx_id].trx_tail = new_lock;
 		}
+		pthread_mutex_unlock(&trx_mgr_latch);
 		/////////
 		new_entry.head = new_entry.tail = new_lock;
 		lock_table.insert({{table_id, key}, new_entry});
@@ -58,6 +67,7 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 			/////////
 			new_lock->lock_mode = lock_mode;
 			new_lock->owner_trx_id = trx_id;
+			pthread_mutex_lock(&trx_mgr_latch);
 			if (trx_table[table_id].trx_head == NULL)
 			{
 				trx_table[trx_id].trx_head = trx_table[trx_id].trx_tail = new_lock;
@@ -68,6 +78,7 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 				tail->trx_next_lock = new_lock;
 				trx_table[trx_id].trx_tail = new_lock;
 			}
+			pthread_mutex_unlock(&trx_mgr_latch);
 			/////////
 
 			pthread_mutex_unlock(&lock_table_latch);
@@ -90,6 +101,8 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 			/////////
 			new_lock->lock_mode = lock_mode;
 			new_lock->owner_trx_id = trx_id;
+
+			pthread_mutex_lock(&trx_mgr_latch);
 			if (trx_table[table_id].trx_head == NULL)
 			{
 				trx_table[trx_id].trx_head = trx_table[trx_id].trx_tail = new_lock;
@@ -100,11 +113,15 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 				tail->trx_next_lock = new_lock;
 				trx_table[trx_id].trx_tail = new_lock;
 			}
+			pthread_mutex_unlock(&trx_mgr_latch);
 			/////////
 
 			if (deadlock_detect(trx_id))
 			{
 				// abort function 구현 및 넣기
+				pthread_mutex_lock(&trx_mgr_latch);
+				trx_table[trx_id].is_aborted = true;
+				pthread_mutex_unlock(&trx_mgr_latch);
 				pthread_mutex_unlock(&lock_table_latch);
 				return nullptr;
 			}

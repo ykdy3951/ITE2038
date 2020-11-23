@@ -55,9 +55,9 @@ int buf_put_page(int index);
 void buf_free_page(int table_id, pagenum_t pagenum, int target_idx);
 int buf_alloc_page(int table_id);
 
-buf_t *buf;
-buf_header_t *buf_header;
-table_t *table;
-pthread_mutex_t buf_mgr_latch;
+extern buf_t *buf;
+extern buf_header_t *buf_header;
+extern table_t *table;
+extern pthread_mutex_t buf_mgr_latch;
 
 #endif

@@ -48,6 +48,7 @@ int trx_commit(int trx_id)
         trx_lock = temp;
     }
 
+    trx_table.erase(trx_id);
     pthread_mutex_unlock(&trx_mgr_latch);
 
     return trx_id;
@@ -69,6 +70,7 @@ bool dfs(int start, vector<int> *graph, bool *vst)
         vst[start] = false;
         return false;
     }
+    return false;
 }
 
 bool deadlock_detect(int trx_id)
@@ -129,16 +131,48 @@ int db_find(int table_id, int64_t key, char *ret_val, int trx_id)
     pthread_mutex_lock(&trx_mgr_latch);
 
     pagenum_t pagenum = find_leaf(table_id, key);
-    int buffer_idx = buf_read_page(table_id, pagenum);
+    int ret;
 
-    lock_t *lock = lock_acquire(table_id, key, trx_id, SHARED);
-    if (lock == nullptr)
+    if (!pagenum)
     {
-        return ABORTED;
+        ret = fail;
     }
+    else
+    {
+        ret = fail;
+        int buffer_idx = buf_read_page(table_id, pagenum);
+        page_t *page = buf[buffer_idx].page;
 
+        for (int i = 0; i < page->header.number_of_keys; i++)
+        {
+            if (page->records[i].key == key)
+            {
+                strcpy(ret_val, page->records[i].value);
+                ret = success;
+                break;
+            }
+            else if (page->records[i].key > key)
+            {
+                break;
+            }
+        }
+        buf_write_page(buffer_idx);
+
+        lock_t *lock = lock_acquire(table_id, key, trx_id, SHARED);
+        if (lock == nullptr)
+        {
+            ret_val = NULL;
+            ret = ABORTED;
+        }
+
+        if (trx_table[trx_id].is_aborted)
+        {
+            ret_val = NULL;
+            ret = ABORTED;
+        }
+    }
     pthread_mutex_unlock(&trx_mgr_latch);
-    return 0;
+    return ret;
 }
 
 int db_update(int table_id, int64_t key, char *values, int trx_id)
@@ -149,6 +183,7 @@ int db_update(int table_id, int64_t key, char *values, int trx_id)
     if (table->fd_table[table_id] == -1)
     {
         printf("[ERROR] YOU HAVE TO OPEN THE EXISTING DATA FILE.\n");
+        pthread_mutex_unlock(&trx_mgr_latch);
         return fail;
     }
 
@@ -156,16 +191,17 @@ int db_update(int table_id, int64_t key, char *values, int trx_id)
     if (buf == NULL)
     {
         printf("[ERROR] NO BUFFER.\n");
+        pthread_mutex_unlock(&trx_mgr_latch);
         return fail;
     }
 
     char *rollback = (char *)malloc(val_size);
-    int ret = db_find(table_id, key, rollback);
+    // int ret = db_find(table_id, key, rollback);
     pagenum_t pagenum = find_leaf(table_id, key);
 
     //
 
-    if (ret || !pagenum)
+    if (!pagenum)
     {
         free(rollback);
         pthread_mutex_unlock(&trx_mgr_latch);
@@ -174,14 +210,6 @@ int db_update(int table_id, int64_t key, char *values, int trx_id)
 
     int buffer_idx = buf_read_page(table_id, pagenum);
     page_t *page = buf[buffer_idx].page;
-    buf_write_page(buffer_idx);
-
-    lock_t *lock = lock_acquire(table_id, key, trx_id, EXCLUSIVE);
-    if (lock == nullptr)
-    {
-        pthread_mutex_unlock(&trx_mgr_latch);
-        return ABORTED;
-    }
 
     int i;
     for (i = 0; i < page->header.number_of_keys; i++)
@@ -196,6 +224,20 @@ int db_update(int table_id, int64_t key, char *values, int trx_id)
 
     // overwrite
     strcpy(page->records[i].value, values);
+
+    buf_write_page(buffer_idx);
+
+    lock_t *lock = lock_acquire(table_id, key, trx_id, EXCLUSIVE);
+
+    if (lock == nullptr || trx_table[trx_id].is_aborted)
+    {
+        int buffer_idx = buf_read_page(table_id, pagenum);
+        strcpy(buf[buffer_idx].page->records[i].value, rollback);
+        buf_write_page(buffer_idx);
+        free(rollback);
+        pthread_mutex_unlock(&trx_mgr_latch);
+        return ABORTED;
+    }
 
     // commit 될 때까지 기다림
     free(rollback);

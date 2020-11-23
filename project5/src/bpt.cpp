@@ -50,10 +50,10 @@ void InitQueue(Queue *q)
     q->count = 0;
 }
 
-data dequeue(Queue *q)
+data_t dequeue(Queue *q)
 {
     Node *node = q->front;
-    data d = node->d;
+    data_t d = node->d;
     q->front = node->next;
     q->count--;
     free(node);
@@ -118,7 +118,7 @@ void printAll(int table_id)
 
     while (!IsEmpty(&q))
     {
-        data d = dequeue(&q);
+        data_t d = dequeue(&q);
 
         page_idx = buf_read_page(table_id, d.pagenum);
         page_t *page = buf[page_idx].page;

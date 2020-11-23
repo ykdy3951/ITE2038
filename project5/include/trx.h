@@ -19,9 +19,16 @@ public:
     lock_t *trx_head;
     lock_t *trx_tail;
     bool is_aborted;
+    trx_t()
+    {
+        trx_id = 0;
+        trx_head = NULL;
+        trx_tail = NULL;
+        is_aborted = false;
+    }
     trx_t(int trx_id)
     {
-        trx_id;
+        trx_id = trx_id;
         trx_head = NULL;
         trx_tail = NULL;
         is_aborted = false;
@@ -33,7 +40,7 @@ int trx_commit(int trx_id);
 bool deadlock_detect(int trx_id);
 
 // global variables for transaction
-int global_trx_id = 0;
+int global_trx_id;
 pthread_mutex_t trx_mgr_latch = PTHREAD_MUTEX_INITIALIZER;
 unordered_map<int, trx_t> trx_table;
 
