@@ -38,10 +38,11 @@ public:
 int trx_begin(void);
 int trx_commit(int trx_id);
 bool deadlock_detect(int trx_id);
+void trx_abort(int trx_id);
 
 // global variables for transaction
-int global_trx_id;
-pthread_mutex_t trx_mgr_latch = PTHREAD_MUTEX_INITIALIZER;
-unordered_map<int, trx_t> trx_table;
+extern int global_trx_id;
+extern pthread_mutex_t trx_mgr_latch;
+extern unordered_map<int, trx_t *> trx_table;
 
 #endif

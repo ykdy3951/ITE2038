@@ -6,6 +6,12 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <stdio.h>
+
+buf_t *buf;
+buf_header_t *buf_header;
+table_t *table;
+pthread_mutex_t buf_mgr_latch;
+
 // Initialize buffer pool with given number and buffer manager.
 int init_db(int num_buf)
 {
@@ -293,10 +299,10 @@ int buf_write_page(int buffer_index)
     // buf[buffer_index].is_pinned--;
     // LRU_func(buffer_index);
     // added for project5
-    pthread_mutex_lock(&buf_mgr_latch);
+    // pthread_mutex_lock(&buf_mgr_latch);
     buf[buffer_index].flag = false;
     pthread_mutex_unlock(&buf[buffer_index].page_latch);
-    pthread_mutex_unlock(&buf_mgr_latch);
+    // pthread_mutex_unlock(&buf_mgr_latch);
     return 0;
 }
 

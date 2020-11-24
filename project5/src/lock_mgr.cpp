@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <iostream>
 
-unordered_map<pair<int, int64_t>, table_entry_t, HashFunction> lock_table;
+unordered_map<pair<int, int64_t>, table_entry_t *, HashFunction> lock_table;
 pthread_mutex_t lock_table_latch;
 
 int init_lock_table()
@@ -30,53 +30,53 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 
 	if (location == lock_table.end())
 	{
-		table_entry_t new_entry(table_id, key);
+		table_entry_t *new_entry = new table_entry_t(table_id, key);
 		lock_t *new_lock = new lock_t();
 		new_lock->state = ACQUIRED;
 		/////////
 		new_lock->lock_mode = lock_mode;
 		new_lock->owner_trx_id = trx_id;
 		pthread_mutex_lock(&trx_mgr_latch);
-		if (trx_table[table_id].trx_head == NULL)
+		if (trx_table[table_id]->trx_head == NULL)
 		{
-			trx_table[trx_id].trx_head = trx_table[trx_id].trx_tail = new_lock;
+			trx_table[trx_id]->trx_head = trx_table[trx_id]->trx_tail = new_lock;
 		}
 		else
 		{
-			lock_t *tail = trx_table[trx_id].trx_tail;
+			lock_t *tail = trx_table[trx_id]->trx_tail;
 			tail->trx_next_lock = new_lock;
-			trx_table[trx_id].trx_tail = new_lock;
+			trx_table[trx_id]->trx_tail = new_lock;
 		}
 		pthread_mutex_unlock(&trx_mgr_latch);
 		/////////
-		new_entry.head = new_entry.tail = new_lock;
+		new_entry->head = new_entry->tail = new_lock;
 		lock_table.insert({{table_id, key}, new_entry});
-		new_lock->sentinel = &(*lock_table.find({table_id, key})).second;
+		new_lock->sentinel = (*lock_table.find({table_id, key})).second;
 		pthread_mutex_unlock(&lock_table_latch);
 		return new_lock;
 	}
 	else
 	{
-		if ((*location).second.head == NULL)
+		if ((*location).second->head == NULL)
 		{
 			lock_t *new_lock = new lock_t();
 			new_lock->state = ACQUIRED;
-			new_lock->sentinel = &(*location).second;
-			(*location).second.head = (*location).second.tail = new_lock;
+			new_lock->sentinel = (*location).second;
+			(*location).second->head = (*location).second->tail = new_lock;
 
 			/////////
 			new_lock->lock_mode = lock_mode;
 			new_lock->owner_trx_id = trx_id;
 			pthread_mutex_lock(&trx_mgr_latch);
-			if (trx_table[table_id].trx_head == NULL)
+			if (trx_table[table_id]->trx_head == NULL)
 			{
-				trx_table[trx_id].trx_head = trx_table[trx_id].trx_tail = new_lock;
+				trx_table[trx_id]->trx_head = trx_table[trx_id]->trx_tail = new_lock;
 			}
 			else
 			{
-				lock_t *tail = trx_table[trx_id].trx_tail;
+				lock_t *tail = trx_table[trx_id]->trx_tail;
 				tail->trx_next_lock = new_lock;
-				trx_table[trx_id].trx_tail = new_lock;
+				trx_table[trx_id]->trx_tail = new_lock;
 			}
 			pthread_mutex_unlock(&trx_mgr_latch);
 			/////////
@@ -87,7 +87,7 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 		// deadlock 탐지 하는 code 작성해야함
 		else
 		{
-			table_entry_t *temp = &(*location).second;
+			table_entry_t *temp = (*location).second;
 			lock_t *new_lock = new lock_t();
 			new_lock->state = WAITING;
 			new_lock->sentinel = temp;
@@ -103,15 +103,15 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 			new_lock->owner_trx_id = trx_id;
 
 			pthread_mutex_lock(&trx_mgr_latch);
-			if (trx_table[table_id].trx_head == NULL)
+			if (trx_table[table_id]->trx_head == NULL)
 			{
-				trx_table[trx_id].trx_head = trx_table[trx_id].trx_tail = new_lock;
+				trx_table[trx_id]->trx_head = trx_table[trx_id]->trx_tail = new_lock;
 			}
 			else
 			{
-				lock_t *tail = trx_table[trx_id].trx_tail;
+				lock_t *tail = trx_table[trx_id]->trx_tail;
 				tail->trx_next_lock = new_lock;
-				trx_table[trx_id].trx_tail = new_lock;
+				trx_table[trx_id]->trx_tail = new_lock;
 			}
 			pthread_mutex_unlock(&trx_mgr_latch);
 			/////////
@@ -119,11 +119,9 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 			if (deadlock_detect(trx_id))
 			{
 				// abort function 구현 및 넣기
-				pthread_mutex_lock(&trx_mgr_latch);
-				trx_table[trx_id].is_aborted = true;
-				pthread_mutex_unlock(&trx_mgr_latch);
+				new_lock->state = ABORT;
 				pthread_mutex_unlock(&lock_table_latch);
-				return nullptr;
+				return new_lock;
 			}
 			// if prev lock pointer's mode is SHARED and its state is acquired state, new_lock's state makes acquire.
 			if (new_lock->prev->lock_mode == SHARED && new_lock->prev->state == ACQUIRED)
@@ -161,7 +159,7 @@ int lock_release(lock_t *lock_obj)
 		// prev lock of lock object exists and is also ACQUIRED
 		if (lock_obj->prev != NULL)
 		{
-			table_entry_t *temp = lock_obj->sentinel;
+			// table_entry_t *temp = lock_obj->sentinel;
 			lock_t *prev = lock_obj->prev;
 			prev->next = lock_obj->next;
 
