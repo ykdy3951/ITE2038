@@ -179,7 +179,7 @@ int db_find(int table_id, int64_t key, char *ret_val, int trx_id)
         return ABORTED;
     }
 
-    pthread_mutex_lock(&buf[buffer_idx].page_latch);
+    buffer_idx = buf_read_page(table_id, pagenum);
     page_t *page = buf[buffer_idx].page;
     for (int i = 0; i < page->header.number_of_keys; i++)
     {
@@ -194,7 +194,7 @@ int db_find(int table_id, int64_t key, char *ret_val, int trx_id)
             break;
         }
     }
-    pthread_mutex_unlock(&buf[buffer_idx].page_latch);
+    buf_write_page(buffer_idx);
     return fail;
 }
 
