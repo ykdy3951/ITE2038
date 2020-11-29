@@ -394,27 +394,30 @@ void trx_abort(int trx_id)
     {
         lock_t *temp = lock->trx_next_lock;
 
-        if (lock->lock_mode == SHARED)
+        if (lock->log != NULL)
         {
-            memset(lock->log->prev, 0, sizeof(char) * 120);
-        }
-        else
-        {
-            table_entry_t *entry = lock->sentinel;
-
-            pagenum_t pagenum = find_leaf(entry->table_id, entry->key);
-            int buff_idx = buf_read_page(entry->table_id, pagenum);
-            page_t *page = buf[buff_idx].page;
-
-            for (int i = 0; i < page->header.number_of_keys; i++)
+            if (lock->lock_mode == SHARED)
             {
-                if (page->records[i].key == entry->key)
-                {
-                    strcpy(page->records[i].value, lock->log->prev);
-                    break;
-                }
+                memset(lock->log->prev, 0, sizeof(char) * 120);
             }
-            buf_write_page(buff_idx);
+            else
+            {
+                table_entry_t *entry = lock->sentinel;
+
+                pagenum_t pagenum = find_leaf(entry->table_id, entry->key);
+                int buff_idx = buf_read_page(entry->table_id, pagenum);
+                page_t *page = buf[buff_idx].page;
+
+                for (int i = 0; i < page->header.number_of_keys; i++)
+                {
+                    if (page->records[i].key == entry->key)
+                    {
+                        strcpy(page->records[i].value, lock->log->prev);
+                        break;
+                    }
+                }
+                buf_write_page(buff_idx);
+            }
         }
         if (lock->state == ACQUIRED)
         {
@@ -449,10 +452,6 @@ void trx_abort(int trx_id)
             else
             {
                 lock->sentinel->tail = prev;
-            }
-            if (lock->lock_mode == EXCLUSIVE)
-            {
-                free(lock->log->prev);
             }
             delete lock;
         }
