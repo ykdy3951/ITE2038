@@ -51,7 +51,7 @@ public:
     lock_t *head;
     table_entry_t(int table_id, int64_t key)
     {
-        table_id = table_id;
+        this->table_id = table_id;
         this->key = key;
         head = NULL;
         tail = NULL;

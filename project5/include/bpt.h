@@ -88,7 +88,7 @@ void print_leaf(int table_id);
 void free_print(int table_id);
 
 int db_insert(int table_id, int64_t key, char *value);
-int db_find(int table_id, int64_t key, char *ret_val);
+// int db_find(int table_id, int64_t key, char *ret_val);
 int db_delete(int table_id, int64_t key);
 
 pagenum_t find_leaf(int table_id, int64_t key);

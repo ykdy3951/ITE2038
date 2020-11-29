@@ -30,9 +30,10 @@ int init_db(int num_buf)
     for (int i = 0; i < num_buf; i++)
     {
         buf[i].is_dirty = 0;
-        buf[i].is_pinned = 0;
+        // buf[i].is_pinned = 0;
         buf[i].prev = -1;
         buf[i].next = -1;
+        buf[i].page_num = 0;
         buf[i].table_id = 0;
         buf[i].header_page = NULL;
         buf[i].page = NULL;
@@ -242,7 +243,7 @@ int buf_init(int buffer_index)
     buf[buffer_index].table_id = 0;
     buf[buffer_index].page_num = 0;
     buf[buffer_index].is_dirty = 0;
-    buf[buffer_index].is_pinned = 0;
+    // buf[buffer_index].is_pinned = 0;
 
     return 0;
 }
@@ -316,6 +317,10 @@ int buf_read_page(int table_id, pagenum_t pagenum)
     // buffer에 찾는 page가 존재하는 경우
     while (buffer_index != -1)
     {
+        if (buffer_index < 0 && buffer_index >= buf_header->buf_size)
+        {
+            break;
+        }
         if (buf[buffer_index].table_id == table_id && buf[buffer_index].page_num == pagenum)
         {
             LRU_func(buffer_index);
@@ -544,7 +549,7 @@ int buf_alloc_page(int table_id)
             // 사용중인 버퍼의 크기를 늘린다.
             buf_header->used_size++;
         }
-        buf[free_idx].is_pinned++;
+        // buf[free_idx].is_pinned++;
     }
 
     buf[header_idx].is_dirty = 1;

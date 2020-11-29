@@ -14,7 +14,7 @@ typedef struct bufferStructure
     int table_id;
     pagenum_t page_num;
     int is_dirty;
-    int is_pinned;
+    // int is_pinned;
     int prev;
     int next;
     pthread_mutex_t page_latch;

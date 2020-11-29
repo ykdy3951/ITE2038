@@ -20,11 +20,14 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 	/* ENJOY CODING !!!! */
 	pthread_mutex_lock(&lock_table_latch);
 
+	pthread_mutex_lock(&trx_mgr_latch);
 	if (trx_table.find(trx_id) == trx_table.end())
 	{
+		pthread_mutex_unlock(&trx_mgr_latch);
 		pthread_mutex_unlock(&lock_table_latch);
 		return nullptr;
 	}
+	pthread_mutex_unlock(&trx_mgr_latch);
 
 	auto location = lock_table.find({table_id, key});
 
@@ -37,13 +40,22 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 		new_lock->lock_mode = lock_mode;
 		new_lock->owner_trx_id = trx_id;
 		pthread_mutex_lock(&trx_mgr_latch);
-		if (trx_table[table_id]->trx_head == NULL)
+		if (trx_table[trx_id]->trx_head == NULL)
 		{
-			trx_table[trx_id]->trx_head = trx_table[trx_id]->trx_tail = new_lock;
+			trx_table[trx_id]->trx_head = new_lock;
+			trx_table[trx_id]->trx_tail = new_lock;
+			// if (trx_table[trx_id]->trx_tail == NULL)
+			// {
+			// 	printf("NULL1\n");
+			// }
 		}
 		else
 		{
 			lock_t *tail = trx_table[trx_id]->trx_tail;
+			// if (tail == NULL)
+			// {
+			// 	printf("NULL\n");
+			// }
 			tail->trx_next_lock = new_lock;
 			trx_table[trx_id]->trx_tail = new_lock;
 		}
@@ -68,13 +80,22 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 			new_lock->lock_mode = lock_mode;
 			new_lock->owner_trx_id = trx_id;
 			pthread_mutex_lock(&trx_mgr_latch);
-			if (trx_table[table_id]->trx_head == NULL)
+			if (trx_table[trx_id]->trx_head == NULL)
 			{
-				trx_table[trx_id]->trx_head = trx_table[trx_id]->trx_tail = new_lock;
+				trx_table[trx_id]->trx_head = new_lock;
+				trx_table[trx_id]->trx_tail = new_lock;
+				// if (trx_table[trx_id]->trx_tail == NULL)
+				// {
+				// 	printf("NULL1\n");
+				// }
 			}
 			else
 			{
 				lock_t *tail = trx_table[trx_id]->trx_tail;
+				// if (tail == NULL)
+				// {
+				// 	printf("NULL\n");
+				// }
 				tail->trx_next_lock = new_lock;
 				trx_table[trx_id]->trx_tail = new_lock;
 			}
@@ -103,13 +124,22 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 			new_lock->owner_trx_id = trx_id;
 
 			pthread_mutex_lock(&trx_mgr_latch);
-			if (trx_table[table_id]->trx_head == NULL)
+			if (trx_table[trx_id]->trx_head == NULL)
 			{
-				trx_table[trx_id]->trx_head = trx_table[trx_id]->trx_tail = new_lock;
+				trx_table[trx_id]->trx_head = new_lock;
+				trx_table[trx_id]->trx_tail = new_lock;
+				// if (trx_table[trx_id]->trx_tail == NULL)
+				// {
+				// 	printf("NULL1\n");
+				// }
 			}
 			else
 			{
 				lock_t *tail = trx_table[trx_id]->trx_tail;
+				// if (tail == NULL)
+				// {
+				// 	printf("NULL\n");
+				// }
 				tail->trx_next_lock = new_lock;
 				trx_table[trx_id]->trx_tail = new_lock;
 			}
@@ -123,6 +153,13 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 				pthread_mutex_unlock(&lock_table_latch);
 				return new_lock;
 			}
+
+			if (new_lock->prev->owner_trx_id == trx_id && new_lock->prev->state == ACQUIRED)
+			{
+				new_lock->state = ACQUIRED;
+				pthread_mutex_unlock(&lock_table_latch);
+				return new_lock;
+			}
 			// if prev lock pointer's mode is SHARED and its state is acquired state, new_lock's state makes acquire.
 			if (new_lock->prev->lock_mode == SHARED && new_lock->prev->state == ACQUIRED)
 			{
@@ -131,7 +168,7 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 				return new_lock;
 			}
 
-			while (temp->head != new_lock)
+			while (new_lock->state != ACQUIRED)
 			{
 				pthread_cond_wait(&new_lock->cond, &lock_table_latch);
 			}
@@ -163,6 +200,11 @@ int lock_release(lock_t *lock_obj)
 			lock_t *prev = lock_obj->prev;
 			prev->next = lock_obj->next;
 
+			if (lock_obj->lock_mode == EXCLUSIVE)
+			{
+				free(lock_obj->log->prev);
+			}
+			delete lock_obj->log;
 			delete lock_obj;
 		}
 
@@ -172,6 +214,11 @@ int lock_release(lock_t *lock_obj)
 			table_entry_t *temp = lock_obj->sentinel;
 			temp->head = lock_obj->next;
 
+			if (lock_obj->lock_mode == EXCLUSIVE)
+			{
+				free(lock_obj->log->prev);
+			}
+			delete lock_obj->log;
 			delete lock_obj;
 			if (temp->head != NULL)
 			{
@@ -192,6 +239,7 @@ int lock_release(lock_t *lock_obj)
 						{
 							lock->state = ACQUIRED;
 							pthread_cond_signal(&lock->cond);
+							lock = lock->next;
 						}
 					}
 				}
@@ -209,6 +257,11 @@ int lock_release(lock_t *lock_obj)
 		table_entry_t *temp = lock_obj->sentinel;
 		temp->head = lock_obj->next;
 
+		if (lock_obj->lock_mode == EXCLUSIVE)
+		{
+			free(lock_obj->log->prev);
+		}
+		delete lock_obj->log;
 		delete lock_obj;
 
 		if (temp->head != NULL)
@@ -230,6 +283,7 @@ int lock_release(lock_t *lock_obj)
 					{
 						lock->state = ACQUIRED;
 						pthread_cond_signal(&lock->cond);
+						lock = lock->next;
 					}
 				}
 			}

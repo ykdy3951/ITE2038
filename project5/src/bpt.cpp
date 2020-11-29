@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "trx.h"
 #include "bpt.h"
 #include "file.h"
 #include "buf.h"
@@ -115,7 +116,6 @@ void printAll(int table_id)
     enqueue(&q, root_pagenum, 0);
     int depth = 0;
     int page_idx;
-
     while (!IsEmpty(&q))
     {
         data_t d = dequeue(&q);
@@ -322,49 +322,49 @@ int db_insert(int table_id, int64_t key, char *value)
     return ret;
 }
 
-int db_find(int table_id, int64_t key, char *ret_val)
-{
-    // 닫혀있거나 열리지 않은 테이블이면 종료
-    if (table->fd_table[table_id] == -1)
-    {
-        printf("[ERROR] YOU HAVE TO OPEN THE EXISTING DATA FILE.\n");
-        return fail;
-    }
+// int db_find(int table_id, int64_t key, char *ret_val)
+// {
+//     // 닫혀있거나 열리지 않은 테이블이면 종료
+//     if (table->fd_table[table_id] == -1)
+//     {
+//         printf("[ERROR] YOU HAVE TO OPEN THE EXISTING DATA FILE.\n");
+//         return fail;
+//     }
 
-    // buffer가 없는 경우 종료
-    if (buf == NULL)
-    {
-        printf("[ERROR] NO BUFFER.\n");
-        return fail;
-    }
+//     // buffer가 없는 경우 종료
+//     if (buf == NULL)
+//     {
+//         printf("[ERROR] NO BUFFER.\n");
+//         return fail;
+//     }
 
-    page_t *page;
+//     page_t *page;
 
-    pagenum_t pagenum = find_leaf(table_id, key);
-    if (pagenum == 0)
-    {
-        return fail;
-    }
+//     pagenum_t pagenum = find_leaf(table_id, key);
+//     if (pagenum == 0)
+//     {
+//         return fail;
+//     }
 
-    int page_idx = buf_read_page(table_id, pagenum);
-    page = buf[page_idx].page;
-    int i;
-    for (i = 0; i < page->header.number_of_keys; i++)
-    {
-        if (page->records[i].key == key)
-        {
-            strcpy(ret_val, page->records[i].value);
-            buf_write_page(page_idx);
-            return success;
-        }
-        else if (page->records[i].key > key)
-        {
-            break;
-        }
-    }
-    buf_write_page(page_idx);
-    return fail;
-}
+//     int page_idx = buf_read_page(table_id, pagenum);
+//     page = buf[page_idx].page;
+//     int i;
+//     for (i = 0; i < page->header.number_of_keys; i++)
+//     {
+//         if (page->records[i].key == key)
+//         {
+//             strcpy(ret_val, page->records[i].value);
+//             buf_write_page(page_idx);
+//             return success;
+//         }
+//         else if (page->records[i].key > key)
+//         {
+//             break;
+//         }
+//     }
+//     buf_write_page(page_idx);
+//     return fail;
+// }
 
 int db_delete(int table_id, int64_t key)
 {
@@ -406,7 +406,7 @@ int db_delete(int table_id, int64_t key)
 pagenum_t find_leaf(int table_id, int64_t key)
 {
     header_page_t *header_page;
-    int header_idx = buf_read_page(table_id, 0);
+    int header_idx = buf_read_page(table_id, (pagenum_t)0);
     header_page = buf[header_idx].header_page;
 
     if (header_page->number_of_pages <= 1 || header_page->root_page_number == 0)

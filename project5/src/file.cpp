@@ -66,6 +66,7 @@ int open_table(char *path_name)
     if (ret == -1)
     {
         ret = ++table->num_of_open;
+        // printf("ret %d\n", ret);
         table->table_path[ret] = (char *)malloc(sizeof(char) * 20);
         strcpy(table->table_path[ret], path_name);
     }
@@ -143,6 +144,8 @@ void file_free_page(int table_id, pagenum_t pagenum)
 void file_read_page(int table_id, pagenum_t pagenum, page_t *dest)
 {
     int ret;
+    // printf("%d\n", table_id);
+    // printf("fd : %d\n", table->fd_table[table_id]);
     ret = pread(table->fd_table[table_id], dest, page_size, pagenum * page_size);
     if (ret == error)
     {
