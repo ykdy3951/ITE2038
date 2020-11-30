@@ -96,7 +96,6 @@ bool dfs(int start, vector<int> *graph, int vst[])
 bool deadlock_detect(int trx_id)
 {
     pthread_mutex_lock(&trx_mgr_latch);
-
     if (trx_table.find(trx_id) == trx_table.end())
     {
         pthread_mutex_unlock(&trx_mgr_latch);
@@ -133,21 +132,20 @@ bool deadlock_detect(int trx_id)
     while (temp)
     {
         lock_t *prev = temp->prev;
-        if (find(graph[trx_id].begin(), graph[trx_id].end(), temp->owner_trx_id) != graph[trx_id].end())
+        if (find(graph[trx_id].begin(), graph[trx_id].end(), temp->owner_trx_id) == graph[trx_id].end())
         {
             graph[trx_id].push_back(temp->owner_trx_id);
         }
         temp = prev;
     }
-
     temp = temp_entry->trx_head;
     while (temp != temp_entry->trx_tail)
     {
         lock_t *loop = temp->sentinel->tail;
         while (loop->owner_trx_id != trx_id)
         {
-            lock_t *prev = temp->prev;
-            if (find(graph[loop->owner_trx_id].begin(), graph[loop->owner_trx_id].end(), temp->owner_trx_id) != graph[loop->owner_trx_id].end())
+            lock_t *prev = loop->prev;
+            if (find(graph[loop->owner_trx_id].begin(), graph[loop->owner_trx_id].end(), temp->owner_trx_id) == graph[loop->owner_trx_id].end())
             {
                 graph[loop->owner_trx_id].push_back(trx_id);
             }
@@ -155,7 +153,8 @@ bool deadlock_detect(int trx_id)
         }
         temp = temp->trx_next_lock;
     }
-
+    // cout << 1 << endl
+    //      << endl;
     result = dfs(trx_id, graph, vst);
 
     delete[] vst;

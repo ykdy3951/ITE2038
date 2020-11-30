@@ -13,6 +13,34 @@ using namespace std;
 
 int table_id = 1;
 
+void *trx1(void *arg)
+{
+    int t1 = trx_begin();
+    int t2 = trx_begin();
+    // int t3 = trx_begin();
+    // int t4 = trx_begin();
+
+    int ret;
+    char a[120];
+    char val[120] = "aaaa";
+    ret = db_find(table_id, 1, a, t2);
+    cout << ret << a << endl;
+    // ret = db_find(table_id, 1, a, t2);
+    // cout << ret << a << endl;
+    // ret = db_find(table_id, 1, a, t3);
+    // cout << ret << a << endl;
+    // cout << ret << a << endl;
+    ret = db_update(table_id, 1, val, t1);
+    cout << ret << val << endl;
+    ret = db_update(table_id, 2, val, t1);
+    cout << ret << val << endl;
+    ret = db_update(table_id, 2, val, t2);
+    cout << ret << val << endl;
+    cout << trx_commit(t1);
+    cout << trx_commit(t2);
+    // cout << trx_commit(t3);
+}
+
 int main(void)
 {
     init_db(1000);
@@ -22,11 +50,15 @@ int main(void)
     {
         db_insert(1, i, const_cast<char *>("aa"));
     }
-    printAll(1);
+    // printAll(1);
+
+    pthread_t tx1;
+
+    pthread_create(&tx1, 0, trx1, NULL);
+    pthread_join(tx1, NULL);
 
     // printAll(1);
-    shutdown_db();
-    return 0;
+    // shutdown_db();
 }
 
 // int main(int argc, char **argv)
