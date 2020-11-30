@@ -24,13 +24,14 @@ int trx_begin(void)
     // }
 
     pthread_mutex_lock(&trx_mgr_latch);
-
+    int ret;
     global_trx_id++;
-    trx_t *entry = new trx_t(global_trx_id);
-    trx_table.insert({global_trx_id, entry});
+    ret = global_trx_id;
+    trx_t *entry = new trx_t(ret);
+    trx_table.insert({ret, entry});
 
     pthread_mutex_unlock(&trx_mgr_latch);
-    return global_trx_id;
+    return ret;
 }
 
 int trx_commit(int trx_id)
