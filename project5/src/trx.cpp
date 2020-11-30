@@ -372,6 +372,7 @@ int db_update(int table_id, int64_t key, char *values, int trx_id)
         }
     }
     strcpy(page->records[i].value, values);
+    buf[buffer_idx].is_dirty = 1;
     buf_write_page(buffer_idx);
 
     return success;
