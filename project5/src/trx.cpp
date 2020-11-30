@@ -107,7 +107,6 @@ bool deadlock_detect(int trx_id)
     lock_t *temp = temp_entry->trx_tail;
     // unordered_map<int, vector<int>> graph;
     vector<int> *graph = new vector<int>[global_trx_id + 1];
-    vector<int> idx;
 
     int *vst = new int[global_trx_id + 1];
     bool result = false;
@@ -137,7 +136,6 @@ bool deadlock_detect(int trx_id)
         graph[trx_id].push_back(temp->owner_trx_id);
         temp = prev;
     }
-    idx.push_back(trx_id);
 
     temp = temp_entry->trx_head;
     while (temp != temp_entry->trx_tail)
@@ -146,18 +144,14 @@ bool deadlock_detect(int trx_id)
         while (loop->owner_trx_id != trx_id)
         {
             lock_t *prev = temp->prev;
-            idx.push_back(loop->owner_trx_id);
-            graph[loop->owner_trx_id].push_back(prev->owner_trx_id);
+            graph[loop->owner_trx_id].push_back(trx_id);
             loop = prev;
         }
         temp = temp->trx_next_lock;
     }
 
-    // erase duplicate
-    sort(idx.begin(), idx.end());
-    idx.erase(unique(idx.begin(), idx.end()), idx.end());
-
     result = dfs(trx_id, graph, vst);
+
     delete[] vst;
     delete[] graph;
     pthread_mutex_unlock(&trx_mgr_latch);
