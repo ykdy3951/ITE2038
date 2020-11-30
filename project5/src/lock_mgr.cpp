@@ -146,14 +146,6 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 			pthread_mutex_unlock(&trx_mgr_latch);
 			/////////
 
-			if (deadlock_detect(trx_id))
-			{
-				// abort function 구현 및 넣기
-				new_lock->state = ABORT;
-				pthread_mutex_unlock(&lock_table_latch);
-				return new_lock;
-			}
-
 			if (new_lock->prev->owner_trx_id == trx_id && new_lock->prev->state == ACQUIRED)
 			{
 				new_lock->state = ACQUIRED;
@@ -164,6 +156,14 @@ lock_t *lock_acquire(int table_id, int64_t key, int trx_id, int lock_mode)
 			if (new_lock->prev->lock_mode == SHARED && new_lock->prev->state == ACQUIRED)
 			{
 				new_lock->state = ACQUIRED;
+				pthread_mutex_unlock(&lock_table_latch);
+				return new_lock;
+			}
+
+			if (deadlock_detect(trx_id))
+			{
+				// abort function 구현 및 넣기
+				new_lock->state = ABORT;
 				pthread_mutex_unlock(&lock_table_latch);
 				return new_lock;
 			}

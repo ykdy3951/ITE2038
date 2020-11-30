@@ -265,7 +265,7 @@ int db_find(int table_id, int64_t key, char *ret_val, int trx_id)
         if (page->records[i].key == key)
         {
             strcpy(ret_val, page->records[i].value);
-            pthread_mutex_unlock(&buf[buffer_idx].page_latch);
+            buf_write_page(buffer_idx);
             return success;
         }
         else if (page->records[i].key > key)

@@ -7,38 +7,57 @@
 #include <string.h>
 #include <stdio.h>
 #include <iostream>
+#include <unistd.h>
 
 using namespace std;
 // MAIN
 
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
 int table_id = 1;
+int flag = 0;
 
 void *trx1(void *arg)
 {
+    pthread_mutex_lock(&mutex);
     int t1 = trx_begin();
+    // int t3 = trx_begin();
+    // int t4 = trx_begin();
+    cout << 1 << endl;
+    int ret;
+    char a[120];
+    char val[120] = "aaaa";
+    ret = db_update(table_id, 1, val, t1);
+    cout << ret << val << endl;
+    while (flag != 1)
+    {
+        pthread_cond_wait(&cond, &mutex);
+    }
+    ret = db_update(table_id, 2, val, t1);
+    cout << ret << val << endl;
+    pthread_mutex_unlock(&mutex);
+}
+
+void *trx2(void *arg)
+{
+    pthread_mutex_lock(&mutex);
     int t2 = trx_begin();
+    cout << 1 << endl;
     // int t3 = trx_begin();
     // int t4 = trx_begin();
 
     int ret;
     char a[120];
     char val[120] = "aaaa";
-    ret = db_find(table_id, 1, a, t2);
-    cout << ret << a << endl;
-    // ret = db_find(table_id, 1, a, t2);
-    // cout << ret << a << endl;
-    // ret = db_find(table_id, 1, a, t3);
-    // cout << ret << a << endl;
-    // cout << ret << a << endl;
-    ret = db_update(table_id, 1, val, t1);
-    cout << ret << val << endl;
-    ret = db_update(table_id, 2, val, t1);
+    ret = db_update(table_id, 1, val, t2);
     cout << ret << val << endl;
     ret = db_update(table_id, 2, val, t2);
     cout << ret << val << endl;
-    cout << trx_commit(t1);
-    cout << trx_commit(t2);
-    // cout << trx_commit(t3);
+    flag = 1;
+    pthread_cond_signal(&cond);
+
+    pthread_mutex_unlock(&mutex);
 }
 
 int main(void)
@@ -53,9 +72,12 @@ int main(void)
     // printAll(1);
 
     pthread_t tx1;
+    pthread_t tx2;
 
     pthread_create(&tx1, 0, trx1, NULL);
+    pthread_create(&tx2, 0, trx2, NULL);
     pthread_join(tx1, NULL);
+    pthread_join(tx2, NULL);
 
     // printAll(1);
     // shutdown_db();
