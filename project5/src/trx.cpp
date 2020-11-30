@@ -133,7 +133,10 @@ bool deadlock_detect(int trx_id)
     while (temp)
     {
         lock_t *prev = temp->prev;
-        graph[trx_id].push_back(temp->owner_trx_id);
+        if (find(graph[trx_id].begin(), graph[trx_id].end(), temp->owner_trx_id) != graph[trx_id].end())
+        {
+            graph[trx_id].push_back(temp->owner_trx_id);
+        }
         temp = prev;
     }
 
@@ -144,7 +147,10 @@ bool deadlock_detect(int trx_id)
         while (loop->owner_trx_id != trx_id)
         {
             lock_t *prev = temp->prev;
-            graph[loop->owner_trx_id].push_back(trx_id);
+            if (find(graph[loop->owner_trx_id].begin(), graph[loop->owner_trx_id].end(), temp->owner_trx_id) != graph[loop->owner_trx_id].end())
+            {
+                graph[loop->owner_trx_id].push_back(trx_id);
+            }
             loop = prev;
         }
         temp = temp->trx_next_lock;
